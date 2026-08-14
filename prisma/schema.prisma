@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id              String  @id @default("default")
+  name            String
+  legalName       String  @default("")
+  address         String  @default("")
+  city            String  @default("")
+  state           String  @default("")
+  stateCode       String  @default("")
+  pincode         String  @default("")
+  phone           String  @default("")
+  email           String  @default("")
+  gstin           String  @default("")
+  pan             String  @default("")
+  bankName        String  @default("")
+  bankAccount     String  @default("")
+  ifsc            String  @default("")
+  invoicePrefix   String  @default("SGD")
+  nextInvoiceNo   Int     @default(1)
+  makingGstMode   String  @default("SEPARATE_5")
+  terms           String  @default("")
+}
+
+model MetalRate {
+  id            String   @id @default(cuid())
+  metal         String
+  purity        String
+  ratePerGram   Decimal
+  effectiveFrom DateTime @default(now())
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String
+  altPhone  String    @default("")
+  address   String    @default("")
+  city      String    @default("")
+  state     String    @default("")
+  pincode   String    @default("")
+  pan       String    @default("")
+  gstin     String    @default("")
+  notes     String    @default("")
+  createdAt DateTime  @default(now())
+  invoices  Invoice[]
+}
+
+model Ornament {
+  id              String        @id @default(cuid())
+  tagNo           String        @unique
+  name            String
+  category        String
+  metal           String
+  purity          String
+  huid            String        @default("")
+  hsn             String        @default("7113")
+  grossWeight     Decimal
+  stoneWeight     Decimal       @default(0)
+  netWeight       Decimal
+  makingType      String        @default("PER_GRAM")
+  makingValue     Decimal       @default(0)
+  wastagePercent  Decimal       @default(0)
+  stoneCharge     Decimal       @default(0)
+  hallmarkCharge  Decimal       @default(0)
+  otherCharge     Decimal       @default(0)
+  costPrice       Decimal?
+  status          String        @default("IN_STOCK")
+  notes           String        @default("")
+  createdAt       DateTime      @default(now())
+  invoiceItems    InvoiceItem[]
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  invoiceNo      String        @unique
+  date           DateTime      @default(now())
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  customerName   String
+  customerPhone  String        @default("")
+  customerAddr   String        @default("")
+  customerPan    String        @default("")
+  customerGstin  String        @default("")
+  placeOfSupply  String        @default("")
+  notes          String        @default("")
+  goldValue      Decimal       @default(0)
+  makingAmount   Decimal       @default(0)
+  wastageAmount  Decimal       @default(0)
+  stoneAmount    Decimal       @default(0)
+  hallmarkAmount Decimal       @default(0)
+  otherAmount    Decimal       @default(0)
+  taxable3       Decimal       @default(0)
+  taxable5       Decimal       @default(0)
+  cgst3          Decimal       @default(0)
+  sgst3          Decimal       @default(0)
+  cgst5          Decimal       @default(0)
+  sgst5          Decimal       @default(0)
+  roundOff       Decimal       @default(0)
+  grandTotal     Decimal       @default(0)
+  oldGoldValue   Decimal       @default(0)
+  netPayable     Decimal       @default(0)
+  paidAmount     Decimal       @default(0)
+  balanceAmount  Decimal       @default(0)
+  status         String        @default("FINAL")
+  createdAt      DateTime      @default(now())
+  items          InvoiceItem[]
+  exchanges      OldGoldItem[]
+  payments       Payment[]
+}
+
+model InvoiceItem {
+  id             String    @id @default(cuid())
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  ornament       Ornament? @relation(fields: [ornamentId], references: [id])
+  ornamentId     String?
+  tagNo          String    @default("")
+  description    String
+  hsn            String    @default("7113")
+  huid           String    @default("")
+  metal          String
+  purity         String
+  category       String    @default("")
+  grossWeight    Decimal
+  stoneWeight    Decimal   @default(0)
+  netWeight      Decimal
+  ratePerGram    Decimal
+  goldValue      Decimal
+  makingType     String
+  makingValue    Decimal
+  makingAmount   Decimal
+  wastagePercent Decimal
+  wastageAmount  Decimal
+  stoneCharge    Decimal   @default(0)
+  hallmarkCharge Decimal   @default(0)
+  otherCharge    Decimal   @default(0)
+  taxable3       Decimal
+  taxable5       Decimal
+  lineTotal      Decimal
+}
+
+model OldGoldItem {
+  id               String  @id @default(cuid())
+  invoice          Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId        String
+  description      String
+  metal            String  @default("GOLD")
+  purity           String
+  grossWeight      Decimal
+  netWeight        Decimal
+  ratePerGram      Decimal
+  deductionPercent Decimal @default(0)
+  amount           Decimal
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  method    String
+  amount    Decimal
+  reference String   @default("")
+  paidAt    DateTime @default(now())
+}

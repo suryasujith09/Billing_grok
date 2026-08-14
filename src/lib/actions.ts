@@ -111,6 +111,7 @@ export async function saveShopAction(
       where: { id: "default" },
       update: {
         name: String(formData.get("name") ?? ""),
+        logoUrl: String(formData.get("logoUrl") ?? ""),
         legalName: String(formData.get("legalName") ?? ""),
         address: String(formData.get("address") ?? ""),
         city: String(formData.get("city") ?? ""),

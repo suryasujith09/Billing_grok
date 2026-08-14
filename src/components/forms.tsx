@@ -32,11 +32,28 @@ function Submit({ children }: { children: string }) {
   );
 }
 
+import { useState } from "react";
+import { Image as ImageIcon, Printer } from "lucide-react";
+
+export function PrintDownloadButton() {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={() => window.print()}
+    >
+      <Printer size={16} />
+      Print / Save as PDF
+    </Button>
+  );
+}
+
 export function ShopForm({
   shop,
 }: {
   shop: {
     name: string;
+    logoUrl?: string;
     legalName: string;
     address: string;
     city: string;
@@ -56,8 +73,77 @@ export function ShopForm({
   };
 }) {
   const [state, action] = useActionState(saveShopAction, null);
+  const [logo, setLogo] = useState(shop.logoUrl || "");
+
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6">
+      {/* Logo Branding Section */}
+      <div className="rounded-lg border border-sand bg-cream/40 p-4">
+        <div className="flex items-center gap-2 mb-2 text-wine font-semibold">
+          <ImageIcon size={18} />
+          <h3 className="font-display text-base">Jewellery House Logo</h3>
+        </div>
+        <p className="text-xs text-stone mb-3">
+          Provide an image URL or choose a preset logo to display on official Tax Invoices.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          <div className="flex-1 w-full space-y-2">
+            <Field label="Logo Image URL">
+              <Input
+                name="logoUrl"
+                value={logo}
+                onChange={(e) => setLogo(e.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+            </Field>
+            <div className="flex flex-wrap gap-2 text-xs pt-1">
+              <span className="text-stone font-medium">Sample Logos:</span>
+              <button
+                type="button"
+                className="text-wine underline hover:text-ink font-mono text-[11px]"
+                onClick={() => setLogo("https://images.unsplash.com/photo-1611591475143-be232935ee37?w=150&auto=format&fit=crop&q=80")}
+              >
+                Gold Crest Emblem
+              </button>
+              <button
+                type="button"
+                className="text-wine underline hover:text-ink font-mono text-[11px]"
+                onClick={() => setLogo("https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=150&auto=format&fit=crop&q=80")}
+              >
+                Diamond Crown
+              </button>
+              {logo ? (
+                <button
+                  type="button"
+                  className="text-danger underline hover:text-red-700 font-mono text-[11px] ml-auto"
+                  onClick={() => setLogo("")}
+                >
+                  Clear logo
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Logo Preview Card */}
+          <div className="w-full sm:w-48 shrink-0 flex flex-col items-center justify-center rounded-md border border-dashed border-sand bg-white p-3 min-h-[90px]">
+            {logo ? (
+              <img
+                src={logo}
+                alt="Shop Logo Preview"
+                className="max-h-16 max-w-full object-contain"
+                onError={() => {}}
+              />
+            ) : (
+              <div className="text-center text-stone">
+                <ImageIcon size={24} className="mx-auto mb-1 opacity-40" />
+                <span className="text-[11px]">No logo set</span>
+              </div>
+            )}
+            <span className="text-[10px] text-stone tracking-wider uppercase mt-1">Invoice Preview</span>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Shop name">
           <Input name="name" defaultValue={shop.name} required />

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { getInvoice, getShop } from "@/lib/queries";
 import { inr, num } from "@/lib/money";
 import { InvoiceDocument } from "@/components/invoice-document";
-import { CancelInvoiceButton, CollectPaymentForm } from "@/components/forms";
-import { Button, Card, PageHeader } from "@/components/ui";
-import { ArrowLeft, Printer } from "lucide-react";
+import { CancelInvoiceButton, CollectPaymentForm, PrintDownloadButton } from "@/components/forms";
+import { Card } from "@/components/ui";
+import { ArrowLeft } from "lucide-react";
 
 export default async function InvoiceDetailPage({
   params,
@@ -38,12 +38,7 @@ export default async function InvoiceDetailPage({
                 </span>
               </div>
             ) : null}
-            <Link href={`/invoices/${id}`} className="no-print">
-              <Button variant="secondary" onClick={undefined}>
-                <Printer size={16} />
-                Print / Download PDF
-              </Button>
-            </Link>
+            <PrintDownloadButton />
             {invoice.status === "FINAL" ? <CancelInvoiceButton id={invoice.id} /> : null}
           </div>
         </div>

@@ -66,6 +66,7 @@ type InvoiceDoc = {
 
 type ShopDoc = {
   name: string;
+  logoUrl?: string;
   legalName: string;
   address: string;
   city: string;
@@ -92,18 +93,27 @@ export function InvoiceDocument({
     <article className="print-sheet mx-auto max-w-[210mm] border-2 border-ink bg-white p-6 text-ink shadow-sm">
       <header className="border-b-2 border-gold pb-4">
         <div className="flex items-start justify-between gap-6">
-          <div>
-            <p className="text-[10px] tracking-[0.28em] text-wine uppercase">Tax invoice</p>
-            <h1 className="font-display mt-1 text-3xl text-wine">{shop.name}</h1>
-            {shop.legalName && shop.legalName !== shop.name ? (
-              <p className="text-sm text-stone">{shop.legalName}</p>
+          <div className="flex items-start gap-4">
+            {shop.logoUrl ? (
+              <img
+                src={shop.logoUrl}
+                alt={shop.name}
+                className="h-16 max-w-[140px] shrink-0 object-contain rounded-sm"
+              />
             ) : null}
-            <p className="mt-2 text-xs leading-relaxed text-stone">
-              {[shop.address, shop.city, shop.state, shop.pincode].filter(Boolean).join(", ")}
-              <br />
-              {shop.phone ? `Ph: ${shop.phone}` : ""}
-              {shop.email ? ` · ${shop.email}` : ""}
-            </p>
+            <div>
+              <p className="text-[10px] tracking-[0.28em] text-wine uppercase">Tax invoice</p>
+              <h1 className="font-display mt-1 text-3xl text-wine">{shop.name}</h1>
+              {shop.legalName && shop.legalName !== shop.name ? (
+                <p className="text-sm text-stone">{shop.legalName}</p>
+              ) : null}
+              <p className="mt-2 text-xs leading-relaxed text-stone">
+                {[shop.address, shop.city, shop.state, shop.pincode].filter(Boolean).join(", ")}
+                <br />
+                {shop.phone ? `Ph: ${shop.phone}` : ""}
+                {shop.email ? ` · ${shop.email}` : ""}
+              </p>
+            </div>
           </div>
           <div className="text-right text-xs">
             <p>

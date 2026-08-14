@@ -10,6 +10,7 @@ datasource db {
 model Shop {
   id              String  @id @default("default")
   name            String
+  logoUrl         String  @default("")
   legalName       String  @default("")
   address         String  @default("")
   city            String  @default("")

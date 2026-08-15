@@ -87,15 +87,36 @@ export function ShopForm({
           Provide an image URL or choose a preset logo to display on official Tax Invoices.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 items-start">
-          <div className="flex-1 w-full space-y-2">
-            <Field label="Logo Image URL">
+          <div className="flex-1 w-full space-y-3">
+            <input type="hidden" name="logoUrl" value={logo} />
+            <Field label="Upload Image File">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      if (event.target?.result) {
+                        setLogo(String(event.target.result));
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="w-full text-xs text-stone file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-wine file:text-cream hover:file:bg-wine-deep cursor-pointer"
+              />
+            </Field>
+
+            <Field label="Or Image Web URL">
               <Input
-                name="logoUrl"
-                value={logo}
+                value={logo.startsWith("data:") ? "[Uploaded local file image]" : logo}
                 onChange={(e) => setLogo(e.target.value)}
                 placeholder="https://example.com/logo.png"
               />
             </Field>
+
             <div className="flex flex-wrap gap-2 text-xs pt-1">
               <span className="text-stone font-medium">Sample Logos:</span>
               <button

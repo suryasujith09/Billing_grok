@@ -95,9 +95,21 @@ export function amountInWords(amount: number): string {
   return `Rupees ${parts.join(" ")} Only`;
 }
 
+// IST = UTC+5:30
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function toIST(date: Date): Date {
+  return new Date(date.getTime() + IST_OFFSET_MS);
+}
+
+function fromIST(ist: Date): Date {
+  return new Date(ist.getTime() - IST_OFFSET_MS);
+}
+
 export function financialYear(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = date.getMonth();
+  const ist = toIST(date);
+  const year = ist.getUTCFullYear();
+  const month = ist.getUTCMonth(); // 0-indexed; April = 3
   const start = month >= 3 ? year : year - 1;
   return `${String(start).slice(-2)}-${String(start + 1).slice(-2)}`;
 }
@@ -112,6 +124,7 @@ export function formatDate(date: Date | string): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: "Asia/Kolkata",
   });
 }
 
@@ -123,24 +136,26 @@ export function formatDateTime(date: Date | string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Kolkata",
   });
 }
 
 export function todayISO(date = new Date()): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
+  const ist = toIST(date);
+  const y = ist.getUTCFullYear();
+  const m = String(ist.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(ist.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
 export function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const ist = toIST(date);
+  ist.setUTCHours(0, 0, 0, 0);
+  return fromIST(ist);
 }
 
 export function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  const ist = toIST(date);
+  ist.setUTCHours(23, 59, 59, 999);
+  return fromIST(ist);
 }

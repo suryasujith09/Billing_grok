@@ -4,14 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, Receipt } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import type { Role } from "@/lib/session";
 
 export function ClientShell({
   shopName,
   ratesFormatted,
+  role,
+  username,
   children,
 }: {
   shopName: string;
   ratesFormatted: { label: string; value: string }[];
+  role: Role;
+  username: string;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -21,6 +26,8 @@ export function ClientShell({
       <div className="flex min-h-screen">
         <Sidebar
           shopName={shopName}
+          role={role}
+          username={username}
           mobileOpen={mobileOpen}
           onCloseMobile={() => setMobileOpen(false)}
         />
@@ -66,12 +73,14 @@ export function ClientShell({
                   <span className="font-medium text-cream">{rate.value}/g</span>
                 </span>
               ))}
-              <Link
-                href="/settings#rates"
-                className="shrink-0 text-[11px] text-gold-soft underline underline-offset-2 hover:text-gold-bright md:text-xs"
-              >
-                Update
-              </Link>
+              {role === "admin" && (
+                <Link
+                  href="/settings#rates"
+                  className="shrink-0 text-[11px] text-gold-soft underline underline-offset-2 hover:text-gold-bright md:text-xs"
+                >
+                  Update
+                </Link>
+              )}
             </div>
           </div>
 

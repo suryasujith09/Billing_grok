@@ -1,13 +1,21 @@
 import { getLatestRates, getShop } from "@/lib/queries";
 import { inr } from "@/lib/money";
+import { getSession } from "@/lib/session";
 import { ClientShell } from "./client-shell";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const [shop, rates] = await Promise.all([getShop(), getLatestRates()]);
+  const [shop, rates, session] = await Promise.all([
+    getShop(),
+    getLatestRates(),
+    getSession(),
+  ]);
+
   const gold22 = rates.find((r) => r.metal === "GOLD" && r.purity === "22K");
   const gold24 = rates.find((r) => r.metal === "GOLD" && r.purity === "24K");
   const gold18 = rates.find((r) => r.metal === "GOLD" && r.purity === "18K");
-  const silver = rates.find((r) => r.metal === "SILVER" && (r.purity === "999" || r.purity === "925"));
+  const silver = rates.find(
+    (r) => r.metal === "SILVER" && (r.purity === "999" || r.purity === "925"),
+  );
 
   const ratesFormatted = [
     { label: "24K", value: gold24 ? inr(Number(gold24.ratePerGram)) : "—" },
@@ -17,7 +25,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <ClientShell shopName={shop.name} ratesFormatted={ratesFormatted}>
+    <ClientShell
+      shopName={shop.name}
+      ratesFormatted={ratesFormatted}
+      role={session?.role ?? "counter"}
+      username={session?.username ?? ""}
+    >
       {children}
     </ClientShell>
   );

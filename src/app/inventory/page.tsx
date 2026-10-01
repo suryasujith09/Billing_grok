@@ -5,6 +5,8 @@ import { CATEGORIES, labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { Plus, Search } from "lucide-react";
 import { InventoryTagActions } from "@/components/inventory-tag-actions";
+import { getLabelTemplates } from "@/lib/printer-actions";
+import type { LabelTemplateConfig } from "@/lib/tspl-engine";
 
 export default async function InventoryPage({
   searchParams,
@@ -17,7 +19,10 @@ export default async function InventoryPage({
   const status = params.status ?? "IN_STOCK";
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
 
-  const result = await listOrnaments({ q, category, status: status || undefined, page });
+  const [result, savedTemplates] = await Promise.all([
+    listOrnaments({ q, category, status: status || undefined, page }),
+    getLabelTemplates(),
+  ]);
   const ornaments = result.items;
 
   const totalPieces = result.count;
@@ -35,8 +40,26 @@ export default async function InventoryPage({
     netWeight: num(item.netWeight),
     stoneWeight: num(item.stoneWeight),
     huid: item.huid,
+    diamondCarat: num(item.diamondCarat),
+    diamondPieces: item.diamondPieces,
+    mrp: item.mrp != null ? num(item.mrp) : null,
     printCount: item.printCount ?? 0,
     lastPrintedAt: item.lastPrintedAt,
+  }));
+  const templates: LabelTemplateConfig[] = savedTemplates.map((template) => ({
+    id: template.id,
+    name: template.name,
+    category: template.category as LabelTemplateConfig["category"],
+    widthMm: template.widthMm,
+    heightMm: template.heightMm,
+    gapMm: template.gapMm,
+    columnsAcross: template.columnsAcross,
+    rollWidthMm: template.rollWidthMm,
+    colGapMm: template.colGapMm,
+    leftWingWidthMm: template.leftWingWidthMm,
+    rightWingWidthMm: template.rightWingWidthMm,
+    tailWidthMm: template.tailWidthMm,
+    elements: JSON.parse(template.elements) as LabelTemplateConfig["elements"],
   }));
   const pageCount = Math.max(1, Math.ceil(result.count / result.pageSize));
   const pageUrl = (nextPage: number) => {
@@ -126,7 +149,11 @@ export default async function InventoryPage({
       </div>
 
       {/* Tag Printing & Interactive Inventory Table */}
-      <InventoryTagActions items={mappedItems} />
+      <InventoryTagActions
+        items={mappedItems}
+        templates={templates}
+        defaultTemplateId={savedTemplates.find((template) => template.isDefault)?.id ?? ""}
+      />
       {result.count > 0 ? (
         <div className="flex items-center justify-between gap-3 text-xs text-stone">
           <span>

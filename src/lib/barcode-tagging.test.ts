@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { mmToDots, generateTsplLabel, DEFAULT_TEMPLATES } from "./tspl-engine";
+import { mmToDots, generateTsplLabel, getPrintPageHeightMm, DEFAULT_TEMPLATES } from "./tspl-engine";
 import { getCategoryCode, isValidTagBarcode } from "./tag-generator";
 
 console.log("=========================================");
@@ -63,5 +63,23 @@ assert.ok(tsplOutput.includes("CLS"), "TSPL output contains CLS buffer clear");
 assert.ok(tsplOutput.includes('BARCODE'), "TSPL output contains BARCODE command");
 assert.ok(tsplOutput.includes("PRINT 1,1"), "TSPL output contains PRINT 1,1");
 console.log("✓ Test 5 Passed: TSPL command generation for TVS LP 46 Dlite verified!");
+
+const dualColumnOutput = generateTsplLabel(sampleItem, DEFAULT_TEMPLATES[1], {
+  widthMm: DEFAULT_TEMPLATES[1].widthMm,
+  heightMm: DEFAULT_TEMPLATES[1].heightMm,
+  gapMm: DEFAULT_TEMPLATES[1].gapMm,
+  density: 10,
+  speed: 4,
+  orientation: 0,
+  copies: 1,
+});
+assert.ok(dualColumnOutput.includes("SIZE 108 mm, 53 mm"), "Two-across template creates one 108×53 mm sheet");
+assert.strictEqual(dualColumnOutput.split("\n").filter((line) => line.startsWith("BARCODE ")).length, 4,
+  "Two-across template prints a barcode in each of four positions");
+assert.ok(dualColumnOutput.includes(',1,2,"SGD26RG00001"'), "Barcode module width follows selected label dimensions");
+assert.ok(dualColumnOutput.includes("BARCODE 8,304,"), "Second row is positioned 28 mm below the first row");
+assert.strictEqual(getPrintPageHeightMm(DEFAULT_TEMPLATES[1]), 53, "Dual-column sheet height includes two tag rows and row gap");
+assert.ok(dualColumnOutput.includes("PRINT 1,1"), "Four-up layout is sent as one page");
+console.log("✓ Test 6 Passed: One-page 2×2 sheet layout and barcode positioning verified");
 
 console.log("\nAll unit tests passed successfully!");

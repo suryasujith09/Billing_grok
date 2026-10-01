@@ -6,6 +6,15 @@ import os from "node:os";
 
 const PORT = process.env.PRINT_AGENT_PORT || 9191;
 const TOKEN = process.env.PRINT_AGENT_TOKEN || "surya-print-secret-token";
+const ALLOWED_ORIGINS = new Set([
+  "https://billing-grok.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  ...(process.env.PRINT_AGENT_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 
 console.log("=================================================");
 console.log(" Surya Jewellery ERP — Local Windows Print Agent ");
@@ -136,12 +145,24 @@ Write-Output "SUCCESS: Sent raw TSPL data to $($printer.Name)"
 }
 
 const server = http.createServer(async (req, res) => {
-  // CORS Headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    res.writeHead(403, { "Content-Type": "application/json", Vary: "Origin" });
+    return res.end(JSON.stringify({ error: "This website is not allowed to use the local print agent." }));
+  }
+
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Max-Age", "600");
+    res.setHeader("Vary", "Origin");
+  }
 
   if (req.method === "OPTIONS") {
+    if (req.headers["access-control-request-private-network"] === "true") {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
     res.writeHead(204);
     return res.end();
   }

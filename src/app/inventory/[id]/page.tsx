@@ -29,6 +29,8 @@ export default async function EditOrnamentPage({
     hallmarkCharge: num(ornament.hallmarkCharge),
     otherCharge: num(ornament.otherCharge),
     costPrice: ornament.costPrice != null ? num(ornament.costPrice) : null,
+    diamondCarat: num(ornament.diamondCarat),
+    mrp: ornament.mrp != null ? num(ornament.mrp) : null,
   };
 
   return (

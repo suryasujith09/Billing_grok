@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import {
   CATEGORIES,
@@ -19,7 +20,6 @@ import {
   saveOrnamentAction,
   saveRatesAction,
   saveShopAction,
-  type ActionState,
 } from "@/lib/actions";
 import { Button, ErrorBanner, Field, Input, Select, SuccessBanner, Textarea } from "./ui";
 
@@ -363,7 +363,11 @@ export function OrnamentForm({
     notes: string;
   };
 }) {
+  const router = useRouter();
   const [state, action] = useActionState(saveOrnamentAction, null);
+  useEffect(() => {
+    if (state?.ok && state.id) router.push(`/inventory/${state.id}`);
+  }, [router, state]);
   return (
     <form action={action} className="space-y-4">
       {item ? <input type="hidden" name="id" value={item.id} /> : null}

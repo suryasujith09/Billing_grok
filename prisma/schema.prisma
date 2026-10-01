@@ -129,6 +129,8 @@ model Invoice {
   items          InvoiceItem[]
   exchanges      OldGoldItem[]
   payments       Payment[]
+
+  @@index([customerId])
 }
 
 model InvoiceItem {
@@ -160,6 +162,9 @@ model InvoiceItem {
   taxable3       Decimal
   taxable5       Decimal
   lineTotal      Decimal
+
+  @@index([invoiceId])
+  @@index([ornamentId])
 }
 
 model OldGoldItem {
@@ -174,6 +179,8 @@ model OldGoldItem {
   ratePerGram      Decimal
   deductionPercent Decimal @default(0)
   amount           Decimal
+
+  @@index([invoiceId])
 }
 
 model Payment {
@@ -184,6 +191,8 @@ model Payment {
   amount    Decimal
   reference String   @default("")
   paidAt    DateTime @default(now())
+
+  @@index([invoiceId])
 }
 
 model PrinterSettings {

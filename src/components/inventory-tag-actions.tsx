@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import type { PrintLog } from "@prisma/client";
-import { printTagAction, bulkPrintTagsAction, getPrintHistory } from "@/lib/printer-actions";
+import {
+  printTagAction,
+  recordTagPrintResultAction,
+  getPrintHistory,
+} from "@/lib/printer-actions";
+import { sendToPrintAgent } from "./print-agent-client";
+import { InventoryLabelPreview } from "./inventory-label-preview";
+import type { LabelTemplateConfig } from "@/lib/tspl-engine";
 import {
   Printer,
   Eye,
@@ -27,18 +34,25 @@ interface InventoryTagActionsProps {
     netWeight: number;
     stoneWeight: number;
     huid: string;
+    diamondCarat: number;
+    diamondPieces: number;
+    mrp: number | null;
     printCount: number;
     lastPrintedAt?: string | Date | null;
   }>;
+  templates: LabelTemplateConfig[];
+  defaultTemplateId: string;
 }
 
-export function InventoryTagActions({ items }: InventoryTagActionsProps) {
+export function InventoryTagActions({ items, templates, defaultTemplateId }: InventoryTagActionsProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [loading, setLoading] = useState(false);
   const [activeModal, setActiveModal] = useState<"preview" | "history" | null>(null);
   const [modalItem, setModalItem] = useState<InventoryTagActionsProps["items"][number] | null>(null);
   const [historyLogs, setHistoryLogs] = useState<PrintLog[]>([]);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === items.length) {
@@ -54,15 +68,35 @@ export function InventoryTagActions({ items }: InventoryTagActionsProps) {
     );
   };
 
+  const printOne = async (ornamentId: string, tagNo: string) => {
+    const prepared = await printTagAction({ ornamentId, tagNo, templateId: selectedTemplateId || undefined, copies: 1 });
+    if (!prepared.ok) return { ok: false, error: prepared.error || `Failed to prepare tag ${tagNo}` };
+
+    const delivery = await sendToPrintAgent(prepared.job);
+    const recorded = await recordTagPrintResultAction({
+      ornamentId,
+      templateId: prepared.job.templateId,
+      copies: prepared.job.copies,
+      error: delivery.ok ? undefined : delivery.error,
+    });
+    if (!recorded.ok && delivery.ok) {
+      return { ok: false, error: `Tag ${tagNo} printed, but print history could not be saved: ${recorded.error}` };
+    }
+    return { ok: delivery.ok, error: delivery.error };
+  };
+
   const handlePrintSingle = async (ornamentId: string, tagNo: string) => {
     setLoading(true);
     setToast(null);
-    const res = await printTagAction({ ornamentId, tagNo, copies: 1 });
-    setLoading(false);
-    if (res.ok) {
-      setToast({ type: "success", text: `Tag ${tagNo} sent to TVS LP 46 Dlite printer!` });
-    } else {
-      setToast({ type: "error", text: res.error || `Failed to print tag ${tagNo}` });
+    try {
+      const res = await printOne(ornamentId, tagNo);
+      setToast(res.ok
+        ? { type: "success", text: `Tag ${tagNo} sent to TVS LP 46 Dlite printer!` }
+        : { type: "error", text: res.error || `Failed to print tag ${tagNo}` });
+    } catch (error) {
+      setToast({ type: "error", text: error instanceof Error ? error.message : `Failed to print tag ${tagNo}` });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,20 +105,24 @@ export function InventoryTagActions({ items }: InventoryTagActionsProps) {
     setLoading(true);
     setToast(null);
 
-    const res = await bulkPrintTagsAction({ ornamentIds: selectedIds, copies: 1 });
-    setLoading(false);
-
-    if (res.ok) {
-      setToast({
-        type: "success",
-        text: `Bulk printed ${res.successCount} tag(s) successfully!`,
-      });
-      setSelectedIds([]);
-    } else {
-      setToast({
-        type: "error",
-        text: `Printed ${res.successCount} of ${res.total}. Failed: ${res.failCount}`,
-      });
+    const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+    let successCount = 0;
+    const errors: string[] = [];
+    try {
+      for (const item of selectedItems) {
+        const result = await printOne(item.id, item.tagNo);
+        if (result.ok) successCount++;
+        else if (result.error) errors.push(`${item.tagNo}: ${result.error}`);
+      }
+      const failCount = selectedItems.length - successCount;
+      setToast(failCount === 0
+        ? { type: "success", text: `Bulk printed ${successCount} tag(s) successfully!` }
+        : { type: "error", text: `Printed ${successCount} of ${selectedItems.length}. ${errors[0] || `${failCount} failed.`}` });
+      if (failCount === 0) setSelectedIds([]);
+    } catch (error) {
+      setToast({ type: "error", text: error instanceof Error ? error.message : "Bulk print failed." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,19 +135,26 @@ export function InventoryTagActions({ items }: InventoryTagActionsProps) {
     setLoading(true);
     setToast(null);
 
-    const res = await bulkPrintTagsAction({ ornamentIds: unprinted, copies: 1 });
-    setLoading(false);
-
-    if (res.ok) {
-      setToast({
-        type: "success",
-        text: `Printed all ${res.successCount} unprinted tag(s)!`,
-      });
-    } else {
-      setToast({
-        type: "error",
-        text: `Printed ${res.successCount} unprinted tags. Failed: ${res.failCount}`,
-      });
+    let successCount = 0;
+    const errors: string[] = [];
+    setLoading(true);
+    setToast(null);
+    try {
+      for (const id of unprinted) {
+        const item = items.find((entry) => entry.id === id);
+        if (!item) continue;
+        const result = await printOne(item.id, item.tagNo);
+        if (result.ok) successCount++;
+        else if (result.error) errors.push(`${item.tagNo}: ${result.error}`);
+      }
+      const failCount = unprinted.length - successCount;
+      setToast(failCount === 0
+        ? { type: "success", text: `Printed all ${successCount} unprinted tag(s)!` }
+        : { type: "error", text: `Printed ${successCount} of ${unprinted.length}. ${errors[0] || `${failCount} failed.`}` });
+    } catch (error) {
+      setToast({ type: "error", text: error instanceof Error ? error.message : "Bulk print failed." });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -143,6 +188,25 @@ export function InventoryTagActions({ items }: InventoryTagActionsProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-cream/70">
+            Label template
+            <select
+              value={selectedTemplateId}
+              onChange={(event) => setSelectedTemplateId(event.target.value)}
+              className="max-w-64 rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
+              aria-label="Label template for printing"
+            >
+              <option value="">Default template</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id} className="bg-royal-deep">
+                  {template.name} · {template.category}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedTemplate?.columnsAcross === 2 && (
+            <span className="text-[11px] text-emerald-300">4 labels per item · 2 across × 2 rows</span>
+          )}
           {selectedIds.length > 0 && (
             <button
               type="button"
@@ -304,38 +368,26 @@ export function InventoryTagActions({ items }: InventoryTagActionsProps) {
               </button>
             </div>
 
-            {/* Simulated 60x25 mm Butterfly Tag */}
-            <div className="flex justify-center p-4 bg-black/40 rounded-lg">
-              <div className="relative w-[480px] h-[200px] bg-white rounded-xs border-2 border-amber-400 p-2 text-black font-sans flex justify-between shadow-xl">
-                {/* Left Wing */}
-                <div className="w-[210px] space-y-1">
-                  <p className="text-[11px] font-bold tracking-tight">SURYA GOLD & DIAMONDS</p>
-                  <p className="text-[12px] font-mono font-bold">{modalItem.tagNo}</p>
-                  <div className="bg-black text-[10px] text-white font-mono p-1 text-center font-bold tracking-widest my-1">
-                    |||||| ||| |||| |
-                  </div>
-                  <p className="text-[10px] text-gray-700">HUID: {modalItem.huid || "N/A"}</p>
-                </div>
-
-                {/* Center Narrow Tail (Adhesive Loop) */}
-                <div className="w-[32px] bg-amber-100 border-x border-dashed border-amber-400 flex items-center justify-center">
-                  <span className="text-[8px] font-bold text-amber-800 -rotate-90 whitespace-nowrap">
-                    LOOP / TAIL
-                  </span>
-                </div>
-
-                {/* Right Wing */}
-                <div className="w-[210px] text-right space-y-1">
-                  <p className="text-[12px] font-bold text-amber-900">{modalItem.metal} {modalItem.purity}</p>
-                  <p className="text-[10px] font-medium">GW: {Number(modalItem.grossWeight || 0).toFixed(3)}g</p>
-                  <p className="text-[10px] font-bold">NW: {Number(modalItem.netWeight || 0).toFixed(3)}g</p>
-                  {modalItem.stoneWeight > 0 && (
-                    <p className="text-[9px] text-gray-600">SW: {Number(modalItem.stoneWeight).toFixed(3)}g</p>
-                  )}
-                  <p className="text-[10px] font-semibold text-gray-800 uppercase">{modalItem.name}</p>
-                </div>
-              </div>
-            </div>
+            {(() => {
+              const selected = templates.find((template) => template.id === selectedTemplateId);
+              return (
+                <>
+                  <p className="text-xs text-cream/70">Previewing: {selected?.name ?? "Printer default template"}</p>
+                  {selected ? (
+                    <InventoryLabelPreview
+                      template={selected}
+                      item={{
+                        tagNo: modalItem.tagNo, name: modalItem.name, category: modalItem.category,
+                        metal: modalItem.metal, purity: modalItem.purity, grossWeight: modalItem.grossWeight,
+                        netWeight: modalItem.netWeight, stoneWeight: modalItem.stoneWeight, huid: modalItem.huid,
+                        diamondCarat: modalItem.diamondCarat, diamondPieces: modalItem.diamondPieces,
+                        mrp: modalItem.mrp,
+                      }}
+                    />
+                  ) : <p className="text-xs text-cream/60">Choose a saved label template to preview its layout here.</p>}
+                </>
+              );
+            })()}
 
             <div className="flex justify-end gap-2 pt-2">
               <button

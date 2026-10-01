@@ -18,7 +18,7 @@ This document details the configuration, local Windows print agent installation,
 
 ## 2. Local Windows Print Agent Installation
 
-To enable 1-click background USB printing directly from the web browser to the TVS printer, a local Windows Print Agent service is included.
+To print from the hosted billing website to a USB printer, the browser sends the print job directly to a local Windows Print Agent on the same PC. The hosted Vercel server cannot connect to `127.0.0.1` on your computer.
 
 ### Step 1: Start the Local Print Agent
 Run the print agent service on the Windows 11 PC connected to the TVS printer:
@@ -31,7 +31,9 @@ npm run print-agent
 node src/print-agent/index.mjs
 ```
 
-The print agent will start listening on `http://127.0.0.1:9191`.
+The print agent will start listening on `http://127.0.0.1:9191`. Keep this process running while printing. In production, the site may ask your browser for permission to access the local network; allow it for `billing-grok.vercel.app`.
+
+If you use a different production domain, add it to `PRINT_AGENT_ALLOWED_ORIGINS` as a comma-separated list before starting the agent. The default allowed origins are the production billing site and local development at `localhost:3000` / `127.0.0.1:3000`.
 
 ### Step 2: Verify Agent Status
 Navigate to `/settings` -> **TVS LP 46 Dlite Printer Settings** in the billing application.
@@ -69,8 +71,8 @@ Follow this 13-step checklist before beginning production label printing:
 ## 4. Troubleshooting Guide
 
 ### Issue A: "Local Print Agent Offline" Banner
-- **Cause**: The Node.js print agent background script is not running on the Windows machine.
-- **Solution**: Open PowerShell / Command Prompt on the Windows PC and run `npm run print-agent`.
+- **Cause**: The local agent is stopped, is running on a different PC, or the browser has not allowed the billing site to access the local network.
+- **Solution**: On the PC connected to the printer, run `npm run print-agent`, allow local-network access for the billing site when prompted, and confirm the configured agent URL is `http://127.0.0.1:9191`.
 
 ### Issue B: Printer Skips Labels or Shifts Alignment
 - **Cause**: Media gap sensor needs calibration or gap size mismatch.

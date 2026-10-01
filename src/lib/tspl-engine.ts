@@ -71,6 +71,8 @@ export interface ItemPrintData {
   productCode?: string;
 }
 
+export const LEGACY_GOLD_DUAL_TEMPLATE_NAME = "Gold 2-Across Dual Column Roll (108×25 mm Paper Roll)";
+
 /**
  * Converts millimeters to dots at 203 DPI (8 dots per mm).
  */
@@ -108,7 +110,7 @@ export const DEFAULT_TEMPLATES: LabelTemplateConfig[] = [
   },
   {
     id: "preset-gold-2across-108x25",
-    name: "Gold 2-Across Dual Column Roll (108×25 mm Paper Roll)",
+    name: "Gold Dual Four-up Sheet (108×53 mm)",
     category: "GOLD",
     widthMm: 52,
     heightMm: 25,
@@ -218,6 +220,12 @@ export function formatFieldValue(
   }
 }
 
+/** The dual-column sheet holds two label rows with the configured row gap between them. */
+export function getPrintPageHeightMm(template: LabelTemplateConfig): number {
+  const rowsDown = template.columnsAcross === 2 ? 2 : 1;
+  return rowsDown * template.heightMm + (rowsDown - 1) * template.gapMm;
+}
+
 /**
  * Builds raw TSPL-EZ command payload for TVS Electronics LP 46 Dlite.
  * Supports single and multi-column paper rolls (1, 2, or 3 tags across the paper roll width).
@@ -240,13 +248,15 @@ export function generateTsplLabel(
   } = options;
 
   const columnsAcross = Math.max(1, template.columnsAcross || 1);
-  const rollWidthMm = template.rollWidthMm || (columnsAcross > 1 ? 108 : widthMm);
-  const colGapMm = template.colGapMm || 2;
+  const rowsDown = columnsAcross === 2 ? 2 : 1;
+  const rollWidthMm = template.rollWidthMm ?? (columnsAcross > 1 ? 108 : widthMm);
+  const colGapMm = template.colGapMm ?? 2;
+  const pageHeightMm = rowsDown * heightMm + (rowsDown - 1) * gapMm;
 
   const lines: string[] = [];
 
   // Setup printer paper roll size
-  lines.push(`SIZE ${rollWidthMm} mm, ${heightMm} mm`);
+  lines.push(`SIZE ${rollWidthMm} mm, ${pageHeightMm} mm`);
   lines.push(`GAP ${gapMm} mm, 0`);
   lines.push(`SPEED ${speed}`);
   lines.push(`DENSITY ${density}`);
@@ -254,31 +264,41 @@ export function generateTsplLabel(
   lines.push(`REFERENCE ${offsetXDots},${offsetYDots}`);
   lines.push(`CLS`); // Clear buffer before drawing
 
-  // Print across all columns defined for the roll
-  for (let c = 0; c < columnsAcross; c++) {
-    const colOffsetX = c * (widthMm + colGapMm);
+  // Place the designed label columns on each row of the physical sheet.
+  for (let row = 0; row < rowsDown; row++) {
+    for (let c = 0; c < columnsAcross; c++) {
+      const colOffsetX = c * (widthMm + colGapMm);
+      const rowOffsetY = row * (heightMm + gapMm);
 
-    for (const elem of template.elements) {
-      if (!elem.isVisible) continue;
+      for (const elem of template.elements) {
+        if (!elem.isVisible) continue;
 
-      const totalXMm = colOffsetX + elem.xMm;
-      const xDots = mmToDots(totalXMm);
-      const yDots = mmToDots(elem.yMm);
-      const rotation = elem.rotation ?? 0;
+        const totalXMm = colOffsetX + elem.xMm;
+        const xDots = mmToDots(totalXMm);
+        const yDots = mmToDots(rowOffsetY + elem.yMm);
+        const rotation = elem.rotation ?? 0;
 
-      if (elem.fieldKey === "barcode") {
-        const heightDots = mmToDots(elem.heightMm || 10);
+        if (elem.fieldKey === "barcode") {
+          const heightDots = mmToDots(elem.heightMm || 10);
+        // Approximate Code 128 width at 11 modules per encoded character plus guards.
+        // Choose the narrow module from the requested width so the physical print tracks
+        // the designer's barcode width instead of always using the same fixed 2/4 dots.
+          const requestedWidthDots = mmToDots(elem.widthMm ?? 24);
+          const moduleCount = Math.max(1, item.tagNo.length * 11 + 35);
+          const narrow = Math.max(1, Math.min(4, Math.floor(requestedWidthDots / moduleCount)));
+          const wide = Math.min(8, narrow * 2);
         // BARCODE x,y,"128",height,human_readable,rotation,narrow,wide,"content"
-        lines.push(
-          `BARCODE ${xDots},${yDots},"128",${heightDots},0,${rotation},2,4,"${item.tagNo}"`
-        );
-      } else {
-        const value = formatFieldValue(elem.fieldKey, item, elem.customText);
-        if (!value) continue;
+          lines.push(
+            `BARCODE ${xDots},${yDots},"128",${heightDots},0,${rotation},${narrow},${wide},"${item.tagNo}"`
+          );
+        } else {
+          const value = formatFieldValue(elem.fieldKey, item, elem.customText);
+          if (!value) continue;
 
-        const font = elem.fontSize ? String(Math.min(Math.max(elem.fontSize, 1), 5)) : "1";
-        const cleanValue = value.replace(/"/g, '\\"');
-        lines.push(`TEXT ${xDots},${yDots},"${font}",${rotation},1,1,"${cleanValue}"`);
+          const font = elem.fontSize ? String(Math.min(Math.max(elem.fontSize, 1), 5)) : "1";
+          const cleanValue = value.replace(/"/g, '\\"');
+          lines.push(`TEXT ${xDots},${yDots},"${font}",${rotation},1,1,"${cleanValue}"`);
+        }
       }
     }
   }

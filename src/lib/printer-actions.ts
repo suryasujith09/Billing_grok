@@ -7,6 +7,7 @@ import { getSession } from "./session";
 import {
   DEFAULT_TEMPLATES,
   generateTsplLabel,
+  LEGACY_GOLD_DUAL_TEMPLATE_NAME,
   type ItemPrintData,
   type LabelElement,
   type LabelTemplateConfig,
@@ -150,6 +151,36 @@ export async function savePrinterSettingsAction(
   }
 }
 
+function repairLegacyPresetLayout<T extends {
+  name: string; widthMm: number; heightMm: number; columnsAcross: number;
+  rollWidthMm: number; colGapMm: number; leftWingWidthMm: number;
+  rightWingWidthMm: number; tailWidthMm: number; elements: string;
+}>(template: T): T {
+  let elements: LabelElement[];
+  try { elements = JSON.parse(template.elements) as LabelElement[]; } catch { return template; }
+  const preset = DEFAULT_TEMPLATES.find((candidate) =>
+    (candidate.name === template.name || template.name === LEGACY_GOLD_DUAL_TEMPLATE_NAME) && candidate.widthMm === template.widthMm &&
+    candidate.heightMm === template.heightMm && JSON.stringify(candidate.elements) === JSON.stringify(elements)
+  );
+  const hasOldPrismaDefaults = template.columnsAcross === 1 && template.rollWidthMm === 60 &&
+    template.colGapMm === 2 && template.leftWingWidthMm === 28 &&
+    template.rightWingWidthMm === 28 && template.tailWidthMm === 4;
+  if (!preset) return template;
+  if (!hasOldPrismaDefaults && template.name === preset.name) return template;
+  return {
+    ...template,
+    name: preset.name,
+    ...(hasOldPrismaDefaults ? {
+      columnsAcross: preset.columnsAcross ?? 1,
+      rollWidthMm: preset.rollWidthMm ?? preset.widthMm,
+      colGapMm: preset.colGapMm ?? 2,
+      leftWingWidthMm: preset.leftWingWidthMm ?? 28,
+      rightWingWidthMm: preset.rightWingWidthMm ?? 28,
+      tailWidthMm: preset.tailWidthMm ?? 4,
+    } : {}),
+  };
+}
+
 export async function getLabelTemplates(shopId = "default") {
   const session = await getSession();
   if (!session) throw new Error("Sign in to view label templates.");
@@ -171,6 +202,12 @@ export async function getLabelTemplates(shopId = "default") {
             widthMm: tmpl.widthMm,
             heightMm: tmpl.heightMm,
             gapMm: tmpl.gapMm,
+            columnsAcross: tmpl.columnsAcross ?? 1,
+            rollWidthMm: tmpl.rollWidthMm ?? tmpl.widthMm,
+            colGapMm: tmpl.colGapMm ?? 2,
+            leftWingWidthMm: tmpl.leftWingWidthMm ?? 28,
+            rightWingWidthMm: tmpl.rightWingWidthMm ?? 28,
+            tailWidthMm: tmpl.tailWidthMm ?? 4,
             elements: JSON.stringify(tmpl.elements),
             isDefault: tmpl.id === "preset-gold-butterfly-60x25",
           },
@@ -178,13 +215,14 @@ export async function getLabelTemplates(shopId = "default") {
       )
     );
 
-    return prisma.labelTemplate.findMany({
+    const seeded = await prisma.labelTemplate.findMany({
       where: { shopId },
       orderBy: { createdAt: "desc" },
     });
+    return seeded.map(repairLegacyPresetLayout);
   }
 
-  return dbTemplates;
+  return dbTemplates.map(repairLegacyPresetLayout);
 }
 
 export async function saveLabelTemplateAction(data: {
@@ -305,11 +343,10 @@ export async function printTagAction(opts: {
   copies?: number;
 }) {
   const session = await getSession();
-  if (!session) return { ok: false, error: "Sign in before printing tags." };
+  if (!session) return { ok: false as const, error: "Sign in before printing tags." };
   if (opts.copies !== undefined && (!Number.isInteger(opts.copies) || opts.copies < 1 || opts.copies > 10)) {
-    return { ok: false, error: "Print copies must be a whole number from 1 to 10." };
+    return { ok: false as const, error: "Print copies must be a whole number from 1 to 10." };
   }
-  const username = session?.username || "counter-user";
   const shop = await getShop();
   const settings = await ensurePrinterSettings("default");
 
@@ -321,10 +358,10 @@ export async function printTagAction(opts: {
     : null;
 
   if (!ornament) {
-    return { ok: false, error: "Jewellery item not found for printing" };
+    return { ok: false as const, error: "Jewellery item not found for printing" };
   }
   if (!isValidTagBarcode(ornament.tagNo)) {
-    return { ok: false, error: `Tag ${ornament.tagNo} is not a valid Code 128 barcode value. Edit the tag number before printing.` };
+    return { ok: false as const, error: `Tag ${ornament.tagNo} is not a valid Code 128 barcode value. Edit the tag number before printing.` };
   }
 
   // Fetch or resolve template
@@ -336,7 +373,7 @@ export async function printTagAction(opts: {
     : templates.find((t) => t.isDefault) || templates[0];
 
   if (opts.templateId && !foundTemplate) {
-    return { ok: false, error: "Label template not found." };
+    return { ok: false as const, error: "Label template not found." };
   }
 
   if (foundTemplate) {
@@ -348,6 +385,12 @@ export async function printTagAction(opts: {
         widthMm: foundTemplate.widthMm,
         heightMm: foundTemplate.heightMm,
         gapMm: foundTemplate.gapMm,
+        columnsAcross: foundTemplate.columnsAcross,
+        rollWidthMm: foundTemplate.rollWidthMm,
+        colGapMm: foundTemplate.colGapMm,
+        leftWingWidthMm: foundTemplate.leftWingWidthMm,
+        rightWingWidthMm: foundTemplate.rightWingWidthMm,
+        tailWidthMm: foundTemplate.tailWidthMm,
         elements: JSON.parse(foundTemplate.elements),
       };
     } catch {
@@ -374,7 +417,7 @@ export async function printTagAction(opts: {
     productCode: ornament.productCode,
   };
 
-  const printCopies = opts.copies || settings.copies || 1;
+  const printCopies = opts.copies ?? settings.copies ?? 1;
 
   const tsplOptions: TSPLPrintOptions = {
     widthMm: templateConfig.widthMm || settings.labelWidthMm,
@@ -390,80 +433,40 @@ export async function printTagAction(opts: {
 
   const tsplData = generateTsplLabel(printItem, templateConfig, tsplOptions);
 
-  let printSuccess = false;
-  let errorMsg = "";
-
-  try {
-    const response = await fetch(`${settings.agentUrl}/print/tspl`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.agentToken}`,
-      },
-      body: JSON.stringify({
-        printerName: settings.printerName,
-        tsplData,
-        copies: printCopies,
-      }),
-      cache: "no-store",
-    });
-
-    if (response.ok) {
-      const resJson = await response.json();
-      printSuccess = resJson.ok === true;
-    } else {
-      const errRes = await response.json().catch(() => ({}));
-      errorMsg = errRes.error || `HTTP ${response.status} from Windows Print Agent`;
-    }
-  } catch (err) {
-    errorMsg = `Could not reach Windows Print Agent at ${settings.agentUrl}. Ensure agent is running. (${err instanceof Error ? err.message : String(err)})`;
-  }
-
-  // Audit Logging
-  await prisma.printLog.create({
-    data: {
-      shopId: "default",
+  return {
+    ok: true as const,
+    tagNo: ornament.tagNo,
+    job: {
       ornamentId: ornament.id,
       tagNo: ornament.tagNo,
       printerName: settings.printerName,
       templateId: templateConfig.id,
-      printedBy: username,
-      status: printSuccess ? "SUCCESS" : "FAILED",
       copies: printCopies,
-      errorMessage: errorMsg,
+      agentUrl: settings.agentUrl,
+      agentToken: settings.agentToken,
+      tsplData,
     },
-  });
-
-  if (printSuccess) {
-    await prisma.ornament.update({
-      where: { id: ornament.id },
-      data: {
-        printCount: { increment: printCopies },
-        lastPrintedAt: new Date(),
-        printedBy: username,
-      },
-    });
-  }
-
-  revalidatePath("/inventory");
-  revalidatePath(`/inventory/${ornament.id}`);
-
-  return {
-    ok: printSuccess,
-    tsplData,
-    error: printSuccess ? undefined : errorMsg,
-    tagNo: ornament.tagNo,
   };
 }
 
 export async function printTestLabelAction(template: LabelTemplateConfig) {
   const session = await getSession();
   if (session?.role !== "admin") {
-    return { ok: false, error: "Only administrators can send a test label." };
+    return { ok: false as const, error: "Only administrators can send a test label." };
   }
 
-  if (!template || !Array.isArray(template.elements) || template.widthMm <= 0 || template.heightMm <= 0) {
-    return { ok: false, error: "The selected label template is invalid." };
+  const columns = template?.columnsAcross ?? 1;
+  const rollWidth = template?.rollWidthMm ?? template?.widthMm;
+  const columnGap = template?.colGapMm ?? 2;
+  if (!template || !Array.isArray(template.elements) || template.widthMm <= 0 || template.heightMm <= 0 ||
+    template.widthMm > 108 || template.heightMm > 300 || template.gapMm < 0 || template.gapMm > 20 ||
+    !Number.isInteger(columns) || columns < 1 || columns > 3 || !Number.isFinite(rollWidth) ||
+    rollWidth <= 0 || rollWidth > 108 || columns * template.widthMm + (columns - 1) * columnGap > rollWidth ||
+    template.elements.some((element) => !Number.isFinite(element.xMm) || !Number.isFinite(element.yMm) ||
+      element.xMm < 0 || element.yMm < 0 || element.xMm >= template.widthMm || element.yMm >= template.heightMm ||
+      element.fieldKey === "barcode" && ((element.widthMm ?? 24) <= 0 || (element.heightMm ?? 10) <= 0 ||
+        element.xMm + (element.widthMm ?? 24) > template.widthMm || element.yMm + (element.heightMm ?? 10) > template.heightMm))) {
+    return { ok: false as const, error: "The selected label template is invalid." };
   }
 
   const settings = await ensurePrinterSettings("default");
@@ -481,6 +484,7 @@ export async function printTestLabelAction(template: LabelTemplateConfig) {
     shopName: shop.name,
     productCode: "RG-001",
   };
+  const copies = 1;
   const tsplData = generateTsplLabel(sampleItem, template, {
     widthMm: template.widthMm,
     heightMm: template.heightMm,
@@ -490,87 +494,91 @@ export async function printTestLabelAction(template: LabelTemplateConfig) {
     orientation: settings.orientation,
     offsetXDots: settings.offsetX,
     offsetYDots: settings.offsetY,
-    copies: 1,
+    copies,
   });
 
-  let errorMessage = "";
-  let printSuccess = false;
-  try {
-    const response = await fetch(`${settings.agentUrl}/print/tspl`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.agentToken}`,
-      },
-      body: JSON.stringify({ printerName: settings.printerName, tsplData, copies: 1 }),
-      cache: "no-store",
-    });
-    const result = await response.json().catch(() => ({}));
-    printSuccess = response.ok && result.ok === true;
-    if (!printSuccess) errorMessage = result.error || `HTTP ${response.status} from Windows Print Agent`;
-  } catch (error) {
-    errorMessage = error instanceof Error ? error.message : "Could not reach Windows Print Agent.";
+  return {
+    ok: true as const,
+    job: {
+      tagNo: sampleItem.tagNo,
+      printerName: settings.printerName,
+      templateId: template.id,
+      copies,
+      agentUrl: settings.agentUrl,
+      agentToken: settings.agentToken,
+      tsplData,
+    },
+  };
+}
+
+export async function recordTagPrintResultAction(opts: {
+  ornamentId: string;
+  templateId: string;
+  copies: number;
+  error?: string;
+}) {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sign in before recording a print job." };
+  if (!Number.isInteger(opts.copies) || opts.copies < 1 || opts.copies > 10) {
+    return { ok: false, error: "Print copies must be a whole number from 1 to 10." };
   }
+  const ornament = await prisma.ornament.findUnique({ where: { id: opts.ornamentId } });
+  if (!ornament) return { ok: false, error: "Jewellery item not found after printing." };
+  const settings = await ensurePrinterSettings("default");
+  const success = !opts.error;
 
   await prisma.printLog.create({
     data: {
       shopId: "default",
-      tagNo: sampleItem.tagNo,
+      ornamentId: ornament.id,
+      tagNo: ornament.tagNo,
       printerName: settings.printerName,
-      templateId: template.id,
+      templateId: opts.templateId,
       printedBy: session.username,
-      status: printSuccess ? "SUCCESS" : "FAILED",
-      errorMessage,
+      status: success ? "SUCCESS" : "FAILED",
+      copies: opts.copies,
+      errorMessage: opts.error?.slice(0, 1000) ?? "",
     },
   });
-
-  return { ok: printSuccess, error: printSuccess ? undefined : errorMessage };
+  if (success) {
+    await prisma.ornament.update({
+      where: { id: ornament.id },
+      data: {
+        printCount: { increment: opts.copies },
+        lastPrintedAt: new Date(),
+        printedBy: session.username,
+      },
+    });
+  }
+  revalidatePath("/inventory");
+  revalidatePath(`/inventory/${ornament.id}`);
+  return {
+    ok: success,
+    error: opts.error,
+  };
 }
 
-export async function bulkPrintTagsAction(opts: {
-  ornamentIds: string[];
-  templateId?: string;
-  copies?: number;
+export async function recordTestPrintResultAction(opts: {
+  templateId: string;
+  error?: string;
 }) {
   const session = await getSession();
-  if (!session) {
-    return { ok: false, error: "Sign in before printing tags.", total: 0, successCount: 0, failCount: 0, errors: [] as string[] };
+  if (session?.role !== "admin") {
+    return { ok: false, error: "Only administrators can record a test label." };
   }
-  const results = {
-    total: opts.ornamentIds?.length || 0,
-    successCount: 0,
-    failCount: 0,
-    errors: [] as string[],
-  };
-
-  if (!opts.ornamentIds || opts.ornamentIds.length === 0) {
-    return {
-      ok: false,
-      error: "No items selected for bulk printing",
-      ...results,
-    };
-  }
-
-  for (const id of opts.ornamentIds) {
-    const res = await printTagAction({
-      ornamentId: id,
+  const settings = await ensurePrinterSettings("default");
+  await prisma.printLog.create({
+    data: {
+      shopId: "default",
+      tagNo: "SGD26RG00001",
+      printerName: settings.printerName,
       templateId: opts.templateId,
-      copies: opts.copies,
-    });
-
-    if (res.ok) {
-      results.successCount++;
-    } else {
-      results.failCount++;
-      if (res.error) results.errors.push(`${res.tagNo || id}: ${res.error}`);
-    }
-  }
-
-  revalidatePath("/inventory");
-  return {
-    ok: results.failCount === 0,
-    ...results,
-  };
+      printedBy: session.username,
+      status: opts.error ? "FAILED" : "SUCCESS",
+      errorMessage: opts.error?.slice(0, 1000) ?? "",
+    },
+  });
+  return { ok: !opts.error, error: opts.error };
 }
 
 export async function getPrintHistory(tagNo?: string) {

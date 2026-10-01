@@ -6,10 +6,14 @@ import {
   saveLabelTemplateAction,
   deleteLabelTemplateAction,
   printTestLabelAction,
+  recordTestPrintResultAction,
 } from "@/lib/printer-actions";
+import { sendToPrintAgent } from "./print-agent-client";
 import {
   DEFAULT_TEMPLATES,
   formatFieldValue,
+  getPrintPageHeightMm,
+  LEGACY_GOLD_DUAL_TEMPLATE_NAME,
   type LabelElement,
   type LabelTemplateConfig,
 } from "@/lib/tspl-engine";
@@ -26,6 +30,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Columns,
+  FilePlus2,
 } from "lucide-react";
 
 interface LabelDesignerProps {
@@ -72,6 +77,7 @@ function Code128Preview({ value, width, height }: { value: string; width: number
       role="img"
       aria-label={`Code 128 barcode preview for ${value}`}
       className="bg-white"
+      style={{ width: `${width}px`, height: `${height}px` }}
       preserveAspectRatio="none"
     />
   );
@@ -113,21 +119,36 @@ const AVAILABLE_FIELDS: { key: LabelElement["fieldKey"]; label: string }[] = [
 export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
   const idPrefix = useId();
   const nextId = useRef(0);
-  const parsedTemplates: LabelTemplateConfig[] = initialTemplates.map((t) => ({
-    id: t.id,
-    name: t.name,
-    category: t.category as LabelTemplateConfig["category"],
-    widthMm: t.widthMm,
-    heightMm: t.heightMm,
-    gapMm: t.gapMm,
-    columnsAcross: t.columnsAcross || 1,
-    rollWidthMm: t.rollWidthMm || (t.columnsAcross && t.columnsAcross > 1 ? 108 : t.widthMm),
-    colGapMm: t.colGapMm || 2,
-    leftWingWidthMm: t.leftWingWidthMm || 28,
-    rightWingWidthMm: t.rightWingWidthMm || 28,
-    tailWidthMm: t.tailWidthMm || 4,
-    elements: typeof t.elements === "string" ? JSON.parse(t.elements) : t.elements,
-  }));
+  const parsedTemplates: LabelTemplateConfig[] = initialTemplates.map((t) => {
+    const elements = typeof t.elements === "string" ? JSON.parse(t.elements) : t.elements;
+    // Earlier seeded rows stored Prisma's geometry defaults rather than each preset's
+    // actual roll layout. Recover those known presets in the editor until saved again.
+    const preset = DEFAULT_TEMPLATES.find((candidate) =>
+      (candidate.name === t.name || t.name === LEGACY_GOLD_DUAL_TEMPLATE_NAME) && candidate.widthMm === t.widthMm &&
+      candidate.heightMm === t.heightMm && JSON.stringify(candidate.elements) === JSON.stringify(elements)
+    );
+    const hasOldPrismaDefaults = (t.columnsAcross == null || t.columnsAcross === 1) &&
+      (t.rollWidthMm == null || t.rollWidthMm === 60) && (t.colGapMm == null || t.colGapMm === 2) &&
+      (t.leftWingWidthMm == null || t.leftWingWidthMm === 28) &&
+      (t.rightWingWidthMm == null || t.rightWingWidthMm === 28) &&
+      (t.tailWidthMm == null || t.tailWidthMm === 4);
+    const recoveredPreset = hasOldPrismaDefaults ? preset : undefined;
+    return {
+      id: t.id,
+      name: preset?.name ?? t.name,
+      category: t.category as LabelTemplateConfig["category"],
+      widthMm: t.widthMm,
+      heightMm: t.heightMm,
+      gapMm: t.gapMm,
+      columnsAcross: recoveredPreset?.columnsAcross ?? t.columnsAcross ?? 1,
+      rollWidthMm: recoveredPreset?.rollWidthMm ?? t.rollWidthMm ?? t.widthMm,
+      colGapMm: recoveredPreset?.colGapMm ?? t.colGapMm ?? 2,
+      leftWingWidthMm: recoveredPreset?.leftWingWidthMm ?? t.leftWingWidthMm ?? 28,
+      rightWingWidthMm: recoveredPreset?.rightWingWidthMm ?? t.rightWingWidthMm ?? 28,
+      tailWidthMm: recoveredPreset?.tailWidthMm ?? t.tailWidthMm ?? 4,
+      elements,
+    };
+  });
 
   const [templates, setTemplates] = useState<LabelTemplateConfig[]>(
     parsedTemplates.length > 0 ? parsedTemplates : DEFAULT_TEMPLATES
@@ -144,6 +165,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
   const [selectedElementId, setSelectedElementId] = useState<string | null>("e3");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; xMm: number; yMm: number } | null>(null);
 
   const handleSelectTemplate = (id: string) => {
     setSelectedTemplateId(id);
@@ -241,6 +263,21 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
     setSelectedTemplateId(dup.id);
   };
 
+  const handleNewTemplate = () => {
+    const id = `preset-${idPrefix}_new_${++nextId.current}`;
+    const template: LabelTemplateConfig = {
+      id, name: "My Custom Label", category: "GENERAL", widthMm: 50,
+      heightMm: 25, gapMm: 3, columnsAcross: 1, rollWidthMm: 50,
+      colGapMm: 0, leftWingWidthMm: 23, rightWingWidthMm: 23, tailWidthMm: 4,
+      elements: [],
+    };
+    setTemplates((prev) => [...prev, template]);
+    setActiveTemplate(template);
+    setSelectedTemplateId(id);
+    setSelectedElementId(null);
+    setMessage(null);
+  };
+
   const handleDeleteTemplate = async () => {
     const savedTemplate = persistedTemplateIds.has(activeTemplate.id);
     if (savedTemplate) {
@@ -264,20 +301,45 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
   const handleTestPrint = async () => {
     setLoading(true);
     setMessage(null);
-    const res = await printTestLabelAction(activeTemplate);
-    setLoading(false);
-    if (res.ok) {
-      setMessage({ type: "success", text: `Test label (${SAMPLE_DEMO_ITEM.tagNo}) sent to SNBC TVSE LP46 Dlite BPLE!` });
-    } else {
-      setMessage({ type: "error", text: res.error || "Could not print test label." });
+    try {
+      const prepared = await printTestLabelAction(activeTemplate);
+      if (!prepared.ok) {
+        setMessage({ type: "error", text: prepared.error || "Could not prepare test label." });
+        return;
+      }
+      const delivery = await sendToPrintAgent(prepared.job);
+      await recordTestPrintResultAction({
+        templateId: prepared.job.templateId,
+        error: delivery.ok ? undefined : delivery.error,
+      });
+      setMessage(delivery.ok
+        ? { type: "success", text: `Test label (${SAMPLE_DEMO_ITEM.tagNo}) sent to ${prepared.job.printerName}!` }
+        : { type: "error", text: delivery.error || "Could not print test label." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not print test label." });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Preview scale: 1mm = 6.5px on screen for high resolution paper roll visualization
-  const SCALE = 6.5;
+  // Fit the printable web into the preview while retaining real millimeter proportions.
+  const SCALE = Math.min(6.5, 560 / Math.max(1, activeTemplate.rollWidthMm ?? activeTemplate.widthMm));
   const columnsCount = Math.max(1, activeTemplate.columnsAcross || 1);
-  const rollWidthMm = activeTemplate.rollWidthMm || (columnsCount > 1 ? 108 : activeTemplate.widthMm);
-  const colGapMm = activeTemplate.colGapMm || 2;
+  const rowsCount = columnsCount === 2 ? 2 : 1;
+  const rollWidthMm = activeTemplate.rollWidthMm ?? (columnsCount > 1 ? 108 : activeTemplate.widthMm);
+  const colGapMm = activeTemplate.colGapMm ?? 2;
+  const layoutWidthMm = columnsCount * activeTemplate.widthMm + (columnsCount - 1) * colGapMm;
+  const invalidLayout = !Number.isFinite(rollWidthMm) || rollWidthMm <= 0 || rollWidthMm > 108 ||
+    !Number.isFinite(activeTemplate.widthMm) || activeTemplate.widthMm <= 0 ||
+    !Number.isFinite(activeTemplate.heightMm) || activeTemplate.heightMm <= 0 ||
+    !Number.isFinite(activeTemplate.gapMm) || activeTemplate.gapMm < 0 ||
+    (activeTemplate.leftWingWidthMm ?? 28) + (activeTemplate.tailWidthMm ?? 4) + (activeTemplate.rightWingWidthMm ?? 28) > activeTemplate.widthMm ||
+    layoutWidthMm > rollWidthMm || activeTemplate.elements.some((element) =>
+      element.xMm < 0 || element.yMm < 0 || element.xMm >= activeTemplate.widthMm ||
+      element.yMm >= activeTemplate.heightMm ||
+      element.fieldKey === "barcode" && ((element.widthMm ?? 24) + element.xMm > activeTemplate.widthMm ||
+        (element.heightMm ?? 10) + element.yMm > activeTemplate.heightMm)
+    );
 
   const rollWidthPx = rollWidthMm * SCALE;
   const tagWidthPx = activeTemplate.widthMm * SCALE;
@@ -290,7 +352,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
       {/* Header Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-royal-card p-4 shadow-lg">
         <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-cream/70">Preset Template:</label>
+          <label className="text-xs font-semibold text-cream/70">Label Template:</label>
           <select
             value={selectedTemplateId}
             onChange={(e) => handleSelectTemplate(e.target.value)}
@@ -305,6 +367,13 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleNewTemplate}
+            className="flex items-center gap-1.5 rounded-md border border-gold/30 px-3 py-1.5 text-xs font-semibold text-gold-bright hover:bg-gold/10 transition"
+          >
+            <FilePlus2 size={14} /> New Template
+          </button>
           <button
             type="button"
             onClick={handleDuplicateTemplate}
@@ -323,15 +392,15 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
           <button
             type="button"
             onClick={handleTestPrint}
-            disabled={loading}
+            disabled={loading || invalidLayout}
             className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold-bright hover:bg-gold/20 transition disabled:opacity-50"
           >
-            <Printer size={14} /> Test Print (TVS LP46 Dlite)
+            <Printer size={14} /> {columnsCount === 2 ? "Test Print (4-up)" : "Test Print (TVS LP46 Dlite)"}
           </button>
           <button
             type="button"
             onClick={handleSaveTemplate}
-            disabled={loading}
+            disabled={loading || invalidLayout}
             className="flex items-center gap-1.5 rounded-md bg-gold px-4 py-1.5 text-xs font-bold text-royal-deep hover:bg-gold-bright transition shadow-md disabled:opacity-50"
           >
             <Save size={14} /> Save Template
@@ -349,6 +418,11 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
         >
           {message.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {message.text}
+        </div>
+      )}
+      {invalidLayout && (
+        <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+          This layout does not fit the selected roll. Check that the roll is up to 108 mm wide, the labels and gaps fit across it, and every field stays inside its label.
         </div>
       )}
 
@@ -369,6 +443,19 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                 onChange={(e) => setActiveTemplate({ ...activeTemplate, name: e.target.value })}
                 className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-cream/70 mb-1">Category</label>
+              <select
+                value={activeTemplate.category}
+                onChange={(e) => setActiveTemplate({ ...activeTemplate, category: e.target.value as LabelTemplateConfig["category"] })}
+                className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
+              >
+                {["GOLD", "DIAMOND", "SILVER", "GENERAL", "REPAIR"].map((category) =>
+                  <option key={category} value={category} className="bg-royal-deep">{category}</option>
+                )}
+              </select>
             </div>
 
             <div>
@@ -409,6 +496,36 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                   }
                   className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-cream/70 mb-1">Label Gap / Feed (mm)</label>
+                <input type="number" min="0" step="0.5" value={activeTemplate.gapMm}
+                  onChange={(e) => setActiveTemplate({ ...activeTemplate, gapMm: Number(e.target.value) })}
+                  className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-cream/70 mb-1">Tail / Unprintable (mm)</label>
+                <input type="number" min="0" step="0.5" value={activeTemplate.tailWidthMm ?? 4}
+                  onChange={(e) => setActiveTemplate({ ...activeTemplate, tailWidthMm: Number(e.target.value) })}
+                  className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-cream/70 mb-1">Left Wing (mm)</label>
+                <input type="number" min="0" step="0.5" value={activeTemplate.leftWingWidthMm ?? 28}
+                  onChange={(e) => setActiveTemplate({ ...activeTemplate, leftWingWidthMm: Number(e.target.value) })}
+                  className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-cream/70 mb-1">Right Wing (mm)</label>
+                <input type="number" min="0" step="0.5" value={activeTemplate.rightWingWidthMm ?? 28}
+                  onChange={(e) => setActiveTemplate({ ...activeTemplate, rightWingWidthMm: Number(e.target.value) })}
+                  className="w-full rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden" />
               </div>
             </div>
 
@@ -465,13 +582,14 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
           <div className="w-full flex items-center justify-between mb-4 border-b border-white/10 pb-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-gold-bright uppercase tracking-wider">
-                Paper Roll Web Alignment Display ({rollWidthMm} mm Web Width × {activeTemplate.heightMm} mm Height)
+                Paper Roll Web Alignment Display ({rollWidthMm} × {getPrintPageHeightMm(activeTemplate)} mm Print Page)
               </span>
               <span className="rounded bg-gold/20 px-2 py-0.5 text-[10px] font-bold text-gold-bright">
                 {columnsCount} Column{columnsCount > 1 ? "s Across" : " Roll"}
               </span>
+              {columnsCount === 2 && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">4 labels · 2 × 2</span>}
             </div>
-            <span className="text-[10px] text-cream/50">Scale: 1mm = 6.5px</span>
+            <span className="text-[10px] text-cream/50">Scale: 1mm = {SCALE.toFixed(1)}px</span>
           </div>
 
           {/* Full Physical Paper Roll Media Container */}
@@ -489,24 +607,27 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
 
             {/* Paper Web Area */}
             <div
-              className="relative bg-white flex items-center gap-0 border border-slate-300"
+              className="relative bg-white border border-slate-300 overflow-hidden"
               style={{
                 width: `${rollWidthPx}px`,
-                height: `${tagHeightPx}px`,
+                height: `${tagHeightPx * rowsCount + (rowsCount - 1) * (activeTemplate.gapMm ?? 3) * SCALE}px`,
               }}
             >
               {/* Render Tag Columns across the roll */}
-              {Array.from({ length: columnsCount }).map((_, colIdx) => {
-                const isFirstCol = colIdx === 0;
+              {Array.from({ length: columnsCount * rowsCount }).map((_, index) => {
+                const rowIdx = Math.floor(index / columnsCount);
+                const colIdx = index % columnsCount;
+                const isFirstCol = rowIdx === 0 && colIdx === 0;
 
                 return (
                   <div
                     key={colIdx}
-                    className={`relative bg-amber-50/40 border border-amber-400/80 shadow-xs flex justify-between overflow-hidden ${
+                  className={`absolute top-0 bg-amber-50/40 border border-amber-400/80 shadow-xs overflow-hidden ${
                       !isFirstCol ? "opacity-90" : ""
                     }`}
                     style={{
-                      left: `${colIdx > 0 ? colGapMm * SCALE : 0}px`,
+                      left: `${colIdx * (activeTemplate.widthMm + colGapMm) * SCALE}px`,
+                      top: `${rowIdx * (activeTemplate.heightMm + (activeTemplate.gapMm ?? 3)) * SCALE}px`,
                       width: `${tagWidthPx}px`,
                       height: `${tagHeightPx}px`,
                     }}
@@ -514,7 +635,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                     {/* Tag Column Label Indicator */}
                     <div className="absolute top-0.5 right-1 z-30 pointer-events-none">
                       <span className="text-[8px] font-mono font-bold bg-amber-200/80 text-amber-900 px-1 rounded">
-                        COL {colIdx + 1}
+                        {rowsCount > 1 ? `ROW ${rowIdx + 1} · ` : ""}COL {colIdx + 1}
                       </span>
                     </div>
 
@@ -522,14 +643,14 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                     <div
                       className="absolute top-0 bottom-0 bg-amber-100/70 border-x border-dashed border-amber-400/90 flex items-center justify-center pointer-events-none z-0"
                       style={{
-                        left: `${(activeTemplate.leftWingWidthMm || 28) * SCALE}px`,
-                        width: `${(activeTemplate.tailWidthMm || 4) * SCALE}px`,
+                        left: `${(activeTemplate.leftWingWidthMm ?? 28) * SCALE}px`,
+                        width: `${(activeTemplate.tailWidthMm ?? 4) * SCALE}px`,
                       }}
                     >
-                      <span className="text-[8px] font-bold text-amber-800 -rotate-90 whitespace-nowrap opacity-60">
-                        Tail (Adhesive)
-                      </span>
+                      {(activeTemplate.tailWidthMm ?? 4) > 0 && <span className="text-[8px] font-bold text-amber-800 -rotate-90 whitespace-nowrap opacity-60">Tail (Adhesive)</span>}
                     </div>
+                    <div aria-hidden="true" className="absolute top-0 bottom-0 border-l border-dotted border-slate-500/50 pointer-events-none z-0"
+                      style={{ left: `${(activeTemplate.widthMm - (activeTemplate.rightWingWidthMm ?? 28)) * SCALE}px` }} />
 
                     {/* Render Elements inside this column */}
                     {activeTemplate.elements.map((elem) => {
@@ -543,8 +664,28 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                           onClick={() => {
                             if (isFirstCol) setSelectedElementId(elem.id);
                           }}
+                          onPointerDown={(event) => {
+                            if (!isFirstCol || event.button !== 0) return;
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            dragRef.current = { id: elem.id, pointerX: event.clientX, pointerY: event.clientY, xMm: elem.xMm, yMm: elem.yMm };
+                            setSelectedElementId(elem.id);
+                          }}
+                          onPointerMove={(event) => {
+                            const drag = dragRef.current;
+                            if (!isFirstCol || !drag || drag.id !== elem.id) return;
+                            const maxX = Math.max(0, activeTemplate.widthMm - (elem.fieldKey === "barcode" ? (elem.widthMm ?? 24) : 1));
+                            const maxY = Math.max(0, activeTemplate.heightMm - (elem.fieldKey === "barcode" ? (elem.heightMm ?? 10) : 1));
+                            handleUpdateElement(elem.id, {
+                              xMm: Number(Math.min(maxX, Math.max(0, drag.xMm + (event.clientX - drag.pointerX) / SCALE)).toFixed(1)),
+                              yMm: Number(Math.min(maxY, Math.max(0, drag.yMm + (event.clientY - drag.pointerY) / SCALE)).toFixed(1)),
+                            });
+                          }}
+                          onPointerUp={(event) => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                            dragRef.current = null;
+                          }}
                           className={`absolute transition select-none ${
-                            isFirstCol ? "cursor-pointer" : "pointer-events-none"
+                            isFirstCol ? "cursor-move touch-none" : "pointer-events-none"
                           } ${
                             isSelected
                               ? "ring-2 ring-gold bg-amber-200/60 shadow-md z-20"
@@ -562,9 +703,6 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                                 width={(elem.widthMm || 24) * SCALE}
                                 height={(elem.heightMm || 10) * SCALE}
                               />
-                              <span className="text-[8px] font-mono font-bold text-black mt-0.5 tracking-tighter">
-                                {SAMPLE_DEMO_ITEM.tagNo}
-                              </span>
                             </div>
                           ) : (
                             <span
@@ -589,12 +727,12 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
 
             {/* Bottom Sensor Gap Marker */}
             <div className="w-full text-center text-[9px] font-mono text-slate-500 mt-1 border-t border-dashed border-slate-400 pt-0.5">
-              GAP SENSOR MARKER ({activeTemplate.gapMm || 3} mm GAP)
+              GAP SENSOR MARKER ({activeTemplate.gapMm ?? 3} mm GAP)
             </div>
           </div>
 
           <p className="text-[11px] text-cream/60 mt-4 text-center">
-            Click elements on Column 1 to position, scale, or edit. The roll layout automatically updates all columns across the {rollWidthMm} mm paper roll.
+            Drag fields on the first label to position them. The preview uses sample product data; a test print sends one sample layout to the printer.
           </p>
         </div>
 
@@ -720,6 +858,23 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                     />
                   </div>
                 </div>
+
+                {activeElement.fieldKey === "barcode" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-cream/70 mb-1">Barcode Width (mm)</label>
+                      <input type="number" min="5" step="0.5" value={activeElement.widthMm ?? 24}
+                        onChange={(e) => handleUpdateElement(activeElement.id, { widthMm: Number(e.target.value) })}
+                        className="w-full rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs text-cream focus:border-gold focus:outline-hidden" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-cream/70 mb-1">Barcode Height (mm)</label>
+                      <input type="number" min="3" step="0.5" value={activeElement.heightMm ?? 10}
+                        onChange={(e) => handleUpdateElement(activeElement.id, { heightMm: Number(e.target.value) })}
+                        className="w-full rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs text-cream focus:border-gold focus:outline-hidden" />
+                    </div>
+                  </div>
+                )}
 
                 {activeElement.fieldKey !== "barcode" && (
                   <div>

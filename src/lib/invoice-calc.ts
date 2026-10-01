@@ -164,6 +164,6 @@ export function calcInvoice(
     oldGoldValue: old,
     netPayable,
     paidAmount: paid,
-    balanceAmount: r2(netPayable - paid),
+    balanceAmount: Math.max(0, r2(netPayable - paid)),
   };
 }

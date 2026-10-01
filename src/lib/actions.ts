@@ -275,7 +275,7 @@ export async function saveOrnamentAction(
   }
 
   revalidatePath("/inventory");
-  redirect(`/inventory/${saved.id}`);
+  return { ok: true, id: saved.id };
 }
 
 export async function lookupTagAction(tagNo: string) {
@@ -318,18 +318,87 @@ export async function lookupTagAction(tagNo: string) {
 
 export async function searchCustomersAction(q: string) {
   const term = q.trim();
-  return prisma.customer.findMany({
-    where: term
-      ? {
-          OR: [
-            { name: { contains: term } },
-            { phone: { contains: term } },
-          ],
-        }
-      : {},
-    orderBy: { name: "asc" },
-    take: 8,
-  });
+  if (term.length < 2) return [];
+  const compactPhone = term.replace(/\D/g, "");
+  const phoneTerms = Array.from(
+    new Set([
+      compactPhone,
+      compactPhone.startsWith("91") && compactPhone.length > 10 ? compactPhone.slice(2) : "",
+    ].filter(Boolean)),
+  );
+  const customerWhere = {
+    OR: [
+      { name: { contains: term, mode: "insensitive" as const } },
+      { pan: { contains: term, mode: "insensitive" as const } },
+      ...phoneTerms.flatMap((phone) => [
+        { phone: { contains: phone } },
+        { altPhone: { contains: phone } },
+      ]),
+    ],
+  };
+  const [customers, invoiceCustomers] = await Promise.all([
+    prisma.customer.findMany({
+      where: customerWhere,
+      orderBy: { name: "asc" },
+      take: 8,
+      select: { id: true, name: true, phone: true, address: true, pan: true, gstin: true },
+    }),
+    prisma.invoice.findMany({
+      where: {
+        OR: [
+          { customerName: { contains: term, mode: "insensitive" } },
+          { customerPan: { contains: term, mode: "insensitive" } },
+          ...phoneTerms.map((phone) => ({ customerPhone: { contains: phone } })),
+        ],
+      },
+      orderBy: { date: "desc" },
+      take: 8,
+      select: {
+        customerId: true,
+        customerName: true,
+        customerPhone: true,
+        customerAddr: true,
+        customerPan: true,
+        customerGstin: true,
+      },
+    }),
+  ]);
+  const results: Array<{
+    id: string | null;
+    name: string;
+    phone: string;
+    address: string;
+    pan: string;
+    gstin: string;
+  }> = customers.map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    address: customer.address,
+    pan: customer.pan,
+    gstin: customer.gstin,
+  }));
+  const seen = new Set<string>();
+  for (const customer of results) {
+    if (customer.phone) seen.add(`p:${customer.phone.replace(/\D/g, "")}`);
+    seen.add(`n:${customer.name.trim().toLowerCase()}`);
+  }
+  for (const invoice of invoiceCustomers) {
+    const phoneKey = invoice.customerPhone.replace(/\D/g, "");
+    const nameKey = invoice.customerName.trim().toLowerCase();
+    if (seen.has(`p:${phoneKey}`) || seen.has(`n:${nameKey}`)) continue;
+    results.push({
+      id: invoice.customerId,
+      name: invoice.customerName,
+      phone: invoice.customerPhone,
+      address: invoice.customerAddr,
+      pan: invoice.customerPan,
+      gstin: invoice.customerGstin,
+    });
+    if (phoneKey) seen.add(`p:${phoneKey}`);
+    seen.add(`n:${nameKey}`);
+  }
+  return results.slice(0, 8);
 }
 
 export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
@@ -374,6 +443,9 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
     oldGoldValue,
     paidAmount,
   );
+  if (paidAmount > totals.netPayable) {
+    return { ok: false, error: "Payment amounts cannot exceed the net payable." };
+  }
 
   const { gstTotal: _g, beforeRound: _b, ...dbTotals } = totals;
 

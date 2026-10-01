@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import {
   CATEGORIES,
   MAKING_TYPES,
@@ -46,6 +46,8 @@ type Line = {
   otherCharge: number;
 };
 
+type StockItem = Omit<Line, "key"> & { ornamentId: string };
+
 type Exchange = {
   key: string;
   description: string;
@@ -60,7 +62,7 @@ type Exchange = {
 type Pay = { key: string; method: string; amount: number; reference: string };
 
 type CustomerHit = {
-  id: string;
+  id: string | null;
   name: string;
   phone: string;
   address: string;
@@ -113,10 +115,14 @@ function emptyExchange(rates: RateRow[]): Exchange {
 
 export function BillingDesk({
   rates,
+  stockItems,
+  stockCount,
   makingGstMode,
   placeOfSupply,
 }: {
   rates: RateRow[];
+  stockItems: StockItem[];
+  stockCount: number;
   makingGstMode: MakingGstMode;
   placeOfSupply: string;
 }) {
@@ -124,8 +130,13 @@ export function BillingDesk({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tag, setTag] = useState("");
+  const [stockQuery, setStockQuery] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [hits, setHits] = useState<CustomerHit[]>([]);
+  const [searchingCustomers, setSearchingCustomers] = useState(false);
+  const [customerSearchError, setCustomerSearchError] = useState(false);
+  const customerSearchSequence = useRef(0);
+  const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [customerId, setCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -199,27 +210,58 @@ export function BillingDesk({
     setTag("");
   }
 
-  async function lookupCustomer(value: string) {
-    setCustomerQuery(value);
-    if (value.trim().length < 2) {
-      setHits([]);
+  function addStockItem(stockItem: StockItem) {
+    setError(null);
+    if (items.some((item) => item.ornamentId === stockItem.ornamentId)) {
+      setError(`Tag ${stockItem.tagNo} is already on this bill.`);
       return;
     }
-    const rows = await searchCustomersAction(value);
-    setHits(
-      rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        phone: row.phone,
-        address: row.address,
-        pan: row.pan,
-        gstin: row.gstin,
-      })),
-    );
+    setItems((current) => [...current, { key: uid(), ...stockItem }]);
+    setStockQuery("");
+  }
+
+  async function lookupCustomer(value: string) {
+    setCustomerQuery(value);
+    setCustomerId("");
+    setCustomerSearchError(false);
+    if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+    if (value.trim().length < 2) {
+      customerSearchSequence.current += 1;
+      setHits([]);
+      setSearchingCustomers(false);
+      setCustomerSearchError(false);
+      return;
+    }
+    setHits([]);
+    setSearchingCustomers(true);
+    const sequence = ++customerSearchSequence.current;
+    customerSearchTimer.current = setTimeout(async () => {
+      try {
+        const rows = await searchCustomersAction(value);
+        if (sequence !== customerSearchSequence.current) return;
+        setHits(
+          rows.map((row) => ({
+            id: row.id,
+            name: row.name,
+            phone: row.phone,
+            address: row.address,
+            pan: row.pan,
+            gstin: row.gstin,
+          })),
+        );
+      } catch {
+        if (sequence === customerSearchSequence.current) {
+          setHits([]);
+          setCustomerSearchError(true);
+        }
+      } finally {
+        if (sequence === customerSearchSequence.current) setSearchingCustomers(false);
+      }
+    }, 250);
   }
 
   function pickCustomer(row: CustomerHit) {
-    setCustomerId(row.id);
+    setCustomerId(row.id ?? "");
     setCustomerName(row.name);
     setCustomerPhone(row.phone);
     setCustomerAddr(row.address);
@@ -237,6 +279,11 @@ export function BillingDesk({
     }
     if (!items.length) {
       setError("Add at least one ornament or loose item.");
+      return;
+    }
+    const paymentTotal = r2(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0));
+    if (paymentTotal > computed.totals.netPayable) {
+      setError("Payment amounts exceed the net payable. Adjust the split before saving.");
       return;
     }
     startTransition(async () => {
@@ -270,6 +317,35 @@ export function BillingDesk({
     .reduce((s, p) => s + Number(p.amount || 0), 0);
   const needsPan = cashPaid > 200000 && !customerPan.trim();
 
+  function splitPaymentEvenly() {
+    const totalPaise = Math.max(0, Math.round(computed.totals.netPayable * 100));
+    setPayments((current) => {
+      const rows = current.length > 1
+        ? current
+        : [...current, { key: uid(), method: "CASH", amount: 0, reference: "" }];
+      const each = Math.floor(totalPaise / rows.length);
+      const remainder = totalPaise % rows.length;
+      return rows.map((row, index) => ({
+        ...row,
+        amount: (each + (index === rows.length - 1 ? remainder : 0)) / 100,
+      }));
+    });
+  }
+
+  function fillRemainingPayment() {
+    setPayments((current) => {
+      if (!current.length) {
+        return [{ key: uid(), method: "UPI", amount: computed.totals.netPayable, reference: "" }];
+      }
+      const target = current[current.length - 1];
+      const allocatedElsewhere = current
+        .filter((row) => row.key !== target.key)
+        .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+      const remainder = Math.max(0, r2(computed.totals.netPayable - allocatedElsewhere));
+      return current.map((row) => row.key === target.key ? { ...row, amount: remainder } : row);
+    });
+  }
+
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
@@ -282,6 +358,7 @@ export function BillingDesk({
                 onClick={() => {
                   setCustomerId("");
                   setCustomerQuery("");
+                  setHits([]);
                 }}
                 type="button"
               >
@@ -297,14 +374,29 @@ export function BillingDesk({
                   className="pl-9"
                   value={customerQuery}
                   onChange={(e) => lookupCustomer(e.target.value)}
-                  placeholder="Name or mobile"
+                  placeholder="Name, mobile, or PAN"
                 />
               </div>
             </Field>
+            {searchingCustomers ? (
+              <p className="absolute z-20 mt-1 w-full rounded-md border border-sand bg-white px-3 py-2 text-sm text-stone shadow-lg">
+                Searching customers…
+              </p>
+            ) : null}
+            {!searchingCustomers && customerSearchError ? (
+              <p className="absolute z-20 mt-1 w-full rounded-md border border-danger/30 bg-white px-3 py-2 text-sm text-danger shadow-lg">
+                Could not search customers. Please try again.
+              </p>
+            ) : null}
+            {!searchingCustomers && !customerSearchError && customerQuery.trim().length >= 2 && hits.length === 0 ? (
+              <p className="absolute z-20 mt-1 w-full rounded-md border border-sand bg-white px-3 py-2 text-sm text-stone shadow-lg">
+                No matching customers found.
+              </p>
+            ) : null}
             {hits.length ? (
               <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-sand bg-white shadow-lg">
                 {hits.map((hit) => (
-                  <li key={hit.id}>
+                  <li key={hit.id ?? `${hit.name}-${hit.phone}`}>
                     <button
                       type="button"
                       className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-cream"
@@ -357,6 +449,53 @@ export function BillingDesk({
                 <Plus size={14} /> Loose item
               </Button>
             </form>
+          </div>
+
+          <div className="mb-5 rounded-md border border-sand bg-white p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Add from available stock</p>
+                <p className="text-xs text-stone">
+                  {stockCount} in-stock {stockCount === 1 ? "item" : "items"}.
+                  {stockCount > stockItems.length ? ` Showing the newest ${stockItems.length}; use tag lookup above for other items.` : " Newly added inventory appears after refresh."}
+                </p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => router.refresh()}>
+                <RefreshCw size={14} /> Refresh
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={stockQuery}
+                onChange={(event) => setStockQuery(event.target.value)}
+                placeholder="Search loaded stock by tag or name"
+                className="min-w-[220px] flex-1"
+              />
+              <Select
+                aria-label="Choose available stock"
+                className="min-w-[220px] flex-1"
+                value=""
+                onChange={(event) => {
+                  const selected = stockItems.find((row) => row.ornamentId === event.target.value);
+                  if (selected) addStockItem(selected);
+                }}
+              >
+                <option value="">Choose stock to add…</option>
+                {stockItems
+                  .filter((row) => {
+                    const query = stockQuery.trim().toLowerCase();
+                    return !query || `${row.tagNo} ${row.description} ${row.category} ${row.metal}`.toLowerCase().includes(query);
+                  })
+                  .map((row) => (
+                    <option key={row.ornamentId} value={row.ornamentId}>
+                      {row.tagNo} · {row.description} · {row.netWeight.toFixed(3)} g
+                    </option>
+                  ))}
+              </Select>
+            </div>
+            {stockCount === 0 ? (
+              <p className="mt-2 text-xs text-stone">No available inventory yet. Add an item in Inventory or use tag lookup.</p>
+            ) : null}
           </div>
 
           {items.length === 0 ? (
@@ -649,20 +788,20 @@ export function BillingDesk({
         </Card>
 
         <Card>
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-display text-xl">Payment</h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setPayments((c) => [...c, { key: uid(), method: "CASH", amount: 0, reference: "" }])}
-            >
-              Split
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPayments((current) => [...current, { key: uid(), method: "CASH", amount: 0, reference: "" }])}>
+                Add method
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={splitPaymentEvenly}>
+                Split equally
+              </Button>
+            </div>
           </div>
           <div className="space-y-3">
             {payments.map((pay) => (
-              <div key={pay.key} className="grid grid-cols-1 sm:grid-cols-6 gap-2 border-b border-sand/30 pb-2 sm:border-0 sm:pb-0">
+              <div key={pay.key} className="grid grid-cols-1 sm:grid-cols-7 gap-2 border-b border-sand/30 pb-2 sm:border-0 sm:pb-0">
                 <Select
                   className="sm:col-span-2"
                   value={pay.method}
@@ -679,6 +818,8 @@ export function BillingDesk({
                 <Input
                   className="sm:col-span-2"
                   type="number"
+                  min="0"
+                  step="0.01"
                   placeholder="Amount"
                   value={pay.amount || ""}
                   onChange={(e) =>
@@ -697,24 +838,33 @@ export function BillingDesk({
                     )
                   }
                 />
+                <button
+                  type="button"
+                  aria-label="Remove payment method"
+                  className="inline-flex min-h-10 items-center justify-center rounded-md text-danger hover:bg-danger/10"
+                  onClick={() => setPayments((current) => current.filter((row) => row.key !== pay.key))}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() =>
-                setPayments((c) => {
-                  if (!c.length) {
-                    return [{ key: uid(), method: "UPI", amount: computed.totals.netPayable, reference: "" }];
-                  }
-                  const [first, ...rest] = c;
-                  return [{ ...first, amount: computed.totals.netPayable }, ...rest.map((row) => ({ ...row, amount: 0 }))];
-                })
-              }
+              onClick={fillRemainingPayment}
             >
-              Fill net payable
+              Fill remaining balance
             </Button>
+            {computed.totals.paidAmount > computed.totals.netPayable ? (
+              <p className="text-xs font-medium text-danger">
+                Allocated {inr(computed.totals.paidAmount)} is over the net payable by {inr(computed.totals.paidAmount - computed.totals.netPayable)}.
+              </p>
+            ) : (
+              <p className="text-xs text-stone">
+                Allocated: {inr(computed.totals.paidAmount)} · Remaining: {inr(r2(computed.totals.netPayable - computed.totals.paidAmount))}
+              </p>
+            )}
           </div>
           <Field label="Notes" className="mt-4">
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />

@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getInvoice, getShop } from "@/lib/queries";
+import { getInvoice, getLatestRates, getShop } from "@/lib/queries";
 import { inr, num } from "@/lib/money";
-import { InvoiceDocument } from "@/components/invoice-document";
+import { InvoiceThemeSwitcher } from "@/components/invoice-theme-switcher";
 import { CancelInvoiceButton, CollectPaymentForm, PrintDownloadButton } from "@/components/forms";
 import { Card } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
@@ -13,7 +13,7 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [invoice, shop] = await Promise.all([getInvoice(id), getShop()]);
+  const [invoice, shop, rates] = await Promise.all([getInvoice(id), getShop(), getLatestRates()]);
 
   if (!invoice) {
     notFound();
@@ -56,9 +56,9 @@ export default async function InvoiceDetailPage({
         ) : null}
       </div>
 
-      {/* Invoice Printable Document */}
+      {/* Invoice Printable Document — with theme switcher */}
       <div className="overflow-x-auto max-w-full pb-4">
-        <InvoiceDocument invoice={invoice} shop={shop} />
+        <InvoiceThemeSwitcher invoice={invoice} shop={shop} rates={rates} />
       </div>
     </div>
   );

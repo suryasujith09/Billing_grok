@@ -181,16 +181,18 @@ export function BillingDesk({
     );
   }
 
-  async function addByTag(event: React.FormEvent) {
-    event.preventDefault();
+  async function addByTag(event?: React.FormEvent) {
+    if (event) event.preventDefault();
     setError(null);
-    const result = await lookupTagAction(tag);
+    const cleanedTag = tag.trim().toUpperCase();
+    if (!cleanedTag) return;
+    const result = await lookupTagAction(cleanedTag);
     if (!result.ok) {
       setError(result.error);
       return;
     }
     if (items.some((item) => item.ornamentId && item.ornamentId === result.item.ornamentId)) {
-      setError("That tag is already on this bill.");
+      setError(`Tag ${cleanedTag} is already on this bill.`);
       return;
     }
     setItems((current) => [...current, { key: uid(), ...result.item }]);
@@ -498,10 +500,11 @@ export function BillingDesk({
                       />
                     </Field>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone md:grid-cols-5">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone md:grid-cols-6">
                     <span>Gold {inr(calc.goldValue)}</span>
                     <span>Wastage {inr(calc.wastageAmount)}</span>
                     <span>Making {inr(calc.makingAmount)}</span>
+                    {item.otherCharge > 0 && <span>Other {inr(item.otherCharge)}</span>}
                     <span>GST {inr(calc.gstTotal)}</span>
                     <span className="font-semibold text-ink">Line {inr(calc.lineTotal)}</span>
                   </div>

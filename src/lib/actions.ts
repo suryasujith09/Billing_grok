@@ -14,8 +14,10 @@ import {
 import { financialYear, num, padInvoice, r2 } from "./money";
 import { getLatestRates, getShop } from "./queries";
 
+import { generateUniqueTagId } from "./tag-generator";
+
 const ornamentSchema = z.object({
-  tagNo: z.string().min(1),
+  tagNo: z.string().optional().default(""),
   name: z.string().min(1),
   category: z.string().min(1),
   metal: z.string().min(1),
@@ -32,6 +34,14 @@ const ornamentSchema = z.object({
   hallmarkCharge: z.coerce.number().nonnegative().optional().default(0),
   otherCharge: z.coerce.number().nonnegative().optional().default(0),
   costPrice: z.coerce.number().nonnegative().optional().nullable(),
+  productCode: z.string().optional().default(""),
+  subcategory: z.string().optional().default(""),
+  stoneDetails: z.string().optional().default(""),
+  stoneUnit: z.string().optional().default("CTS"),
+  diamondCarat: z.coerce.number().nonnegative().optional().default(0),
+  diamondPieces: z.coerce.number().int().nonnegative().optional().default(0),
+  mrp: z.coerce.number().nonnegative().optional().nullable(),
+  supplier: z.string().optional().default(""),
   notes: z.string().optional().default(""),
 });
 
@@ -201,10 +211,17 @@ export async function saveOrnamentAction(
   _prev: ActionState | null,
   formData: FormData,
 ): Promise<ActionState> {
+  const category = String(formData.get("category") ?? "RING");
+  let tagNo = String(formData.get("tagNo") ?? "").trim().toUpperCase();
+
+  if (!tagNo) {
+    tagNo = await generateUniqueTagId({ category });
+  }
+
   const parsed = ornamentSchema.safeParse({
-    tagNo: String(formData.get("tagNo") ?? "").toUpperCase(),
+    tagNo,
     name: formData.get("name"),
-    category: formData.get("category"),
+    category,
     metal: formData.get("metal"),
     purity: formData.get("purity"),
     huid: formData.get("huid") ?? "",
@@ -219,13 +236,24 @@ export async function saveOrnamentAction(
     hallmarkCharge: formData.get("hallmarkCharge") || 0,
     otherCharge: formData.get("otherCharge") || 0,
     costPrice: formData.get("costPrice") || null,
+    productCode: formData.get("productCode") ?? "",
+    subcategory: formData.get("subcategory") ?? "",
+    stoneDetails: formData.get("stoneDetails") ?? "",
+    stoneUnit: formData.get("stoneUnit") ?? "CTS",
+    diamondCarat: formData.get("diamondCarat") || 0,
+    diamondPieces: formData.get("diamondPieces") || 0,
+    mrp: formData.get("mrp") || null,
+    supplier: formData.get("supplier") ?? "",
     notes: formData.get("notes") ?? "",
   });
+
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid ornament" };
   }
+
   const id = String(formData.get("id") ?? "");
   const data = parsed.data;
+
   try {
     const saved = id
       ? await prisma.ornament.update({ where: { id }, data })
@@ -342,7 +370,11 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
 
   try {
     const invoice = await prisma.$transaction(async (tx) => {
-      const current = await tx.shop.findUniqueOrThrow({ where: { id: "default" } });
+      const current = await tx.shop.upsert({
+        where: { id: "default" },
+        update: {},
+        create: { id: "default", name: "Surya Gold and Diamonds" },
+      });
       const invoiceNo = `${current.invoicePrefix}/${financialYear()}/${padInvoice(current.nextInvoiceNo)}`;
 
       const created = await tx.invoice.create({

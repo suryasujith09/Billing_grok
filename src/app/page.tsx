@@ -77,7 +77,7 @@ export default async function DashboardPage() {
           <Card padded={false}>
             <div className="flex items-center justify-between border-b border-sand px-5 py-4">
               <h2 className="font-display text-lg font-semibold text-ink">Recent Invoices</h2>
-              <Link href="/invoices" className="text-xs font-medium text-wine hover:underline">
+              <Link href="/invoices" className="text-xs font-medium text-royal hover:underline">
                 View all →
               </Link>
             </div>
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
                         <td className="px-5 py-3.5 text-right">
                           <Link
                             href={`/invoices/${inv.id}`}
-                            className="text-xs font-semibold text-wine hover:underline"
+                            className="text-xs font-semibold text-royal hover:underline"
                           >
                             View & Print
                           </Link>
@@ -195,7 +195,7 @@ export default async function DashboardPage() {
                       </p>
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="text-[11px] font-semibold text-wine hover:underline"
+                        className="text-[11px] font-semibold text-royal hover:underline"
                       >
                         Collect
                       </Link>

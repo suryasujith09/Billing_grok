@@ -1,20 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
 
+.font-bodoni {
+  font-family: 'Bodoni Moda', Georgia, serif;
+}
+
+.font-garamond {
+  font-family: 'EB Garamond', Garamond, Georgia, serif;
+}
+
+.font-hanken {
+  font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+}
+
+@media print {
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}
+
 @theme inline {
-  --color-ink: #1c110c;
-  --color-wine: #4a1518;
-  --color-wine-deep: #2a0b0d;
-  --color-gold: #c4a35a;
-  --color-gold-soft: #d8bc78;
-  --color-gold-bright: #ead08a;
-  --color-cream: #f4eee4;
-  --color-paper: #fbf7f0;
-  --color-sand: #e7dcc8;
-  --color-stone: #74685c;
-  --color-line: #ddd0bb;
-  --color-ok: #2f6b4f;
-  --color-warn: #9a4b16;
-  --color-danger: #9b2335;
+  --color-ink: #0f172a;
+  --color-royal: #2563eb;
+  --color-royal-deep: #1e3a8a;
+  --color-gold: #d97706;
+  --color-gold-soft: #fbbf24;
+  --color-gold-bright: #f59e0b;
+  --color-cream: #ffffff;
+  --color-paper: #f8fafc;
+  --color-sand: #e2e8f0;
+  --color-stone: #64748b;
+  --color-line: #cbd5e1;
+  --color-ok: #16a34a;
+  --color-warn: #d97706;
+  --color-danger: #dc2626;
   --font-sans: var(--font-ui);
   --font-display: var(--font-display);
 }
@@ -73,17 +97,66 @@ input[type="number"] {
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm 7mm;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #1c110c !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10.5px !important;
+    width: 100% !important;
+  }
+
   .no-print {
     display: none !important;
   }
 
-  body {
-    background: white;
-  }
-
   .print-sheet {
     box-shadow: none !important;
-    border-color: #111 !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+  }
+
+  /* Ensure all backgrounds print */
+  [style*="background"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure images (logos) are visible in print */
+  img {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: inline-block !important;
+    max-width: 100% !important;
+  }
+
+  tr,
+  table,
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Avoid footer being cut off */
+  footer {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
-

@@ -19,7 +19,7 @@ export function PageHeader({
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow ? (
-          <p className="mb-1 text-[11px] font-semibold tracking-[0.22em] text-wine uppercase">
+          <p className="mb-1 text-[11px] font-semibold tracking-[0.22em] text-royal uppercase">
             {eyebrow}
           </p>
         ) : null}
@@ -81,7 +81,7 @@ export function Button({
   size?: "sm" | "md";
 }) {
   const variants = {
-    primary: "bg-wine text-cream hover:bg-wine-deep border-wine",
+    primary: "bg-royal text-cream hover:bg-royal-deep border-royal",
     secondary: "bg-ink text-gold-bright hover:bg-black border-ink",
     ghost: "bg-transparent text-ink hover:bg-sand/60 border-sand",
     danger: "bg-danger text-white hover:bg-[#7d1b2a] border-danger",

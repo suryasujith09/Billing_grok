@@ -90,7 +90,7 @@ export default async function CustomerDetailPage({
                     )}
                     <Link
                       href={`/invoices/${inv.id}`}
-                      className="text-xs text-wine font-semibold hover:underline block mt-0.5"
+                      className="text-xs text-royal font-semibold hover:underline block mt-0.5"
                     >
                       View Invoice →
                     </Link>

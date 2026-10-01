@@ -118,10 +118,15 @@ export function Sidebar({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-wine-deep text-cream md:flex">
-        <div className="border-b border-white/10 px-5 py-6">
-          <p className="text-[10px] tracking-[0.28em] text-gold-soft uppercase">Jewellery house</p>
-          <p className="font-display mt-2 text-[22px] leading-tight text-gold-bright">{shopName}</p>
+      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-royal-deep text-cream md:flex">
+        <div className="border-b border-white/10 px-5 py-4 flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 border border-gold/40 p-1 shadow-xs">
+            <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] tracking-[0.25em] text-gold-soft uppercase">Jewellery House</p>
+            <p className="font-display truncate text-lg font-bold leading-tight text-gold-bright">{shopName}</p>
+          </div>
         </div>
         <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
           <NavLinks role={role} />
@@ -139,19 +144,25 @@ export function Sidebar({
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={onCloseMobile}
+            aria-hidden="true"
           />
 
-          {/* Drawer Panel */}
-          <aside className="fixed inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-wine-deep text-cream shadow-2xl pb-safe">
+          {/* Drawer Sheet */}
+          <div className="fixed inset-y-0 left-0 flex w-72 max-w-full flex-col bg-royal-deep text-cream shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <p className="text-[10px] tracking-[0.28em] text-gold-soft uppercase">Jewellery house</p>
-                <p className="font-display mt-1 text-xl font-medium text-gold-bright">{shopName}</p>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 border border-gold/40 p-1">
+                  <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] tracking-[0.22em] text-gold-soft uppercase">Jewellery House</p>
+                  <p className="font-display truncate text-base font-bold text-gold-bright">{shopName}</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={onCloseMobile}
-                className="rounded-md p-2 text-cream/70 hover:bg-white/10 hover:text-cream"
+                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-cream/70 hover:bg-white/10 hover:text-cream"
                 aria-label="Close menu"
               >
                 <X size={20} />
@@ -166,7 +177,7 @@ export function Sidebar({
               <UserBadge role={role} username={username} />
               <LogoutButton mobile />
             </div>
-          </aside>
+          </div>
         </div>
       ) : null}
     </>

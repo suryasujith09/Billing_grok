@@ -4,7 +4,29 @@ import { endOfDay, num, startOfDay } from "./money";
 export async function getShop() {
   const shop = await prisma.shop.findUnique({ where: { id: "default" } });
   if (!shop) {
-    throw new Error("Shop is not set up. Run npm run db:seed.");
+    // Return a safe default on first boot before seed/setup is run
+    return {
+      id: "default",
+      name: "Surya Gold and Diamonds",
+      logoUrl: "",
+      legalName: "",
+      address: "",
+      city: "",
+      state: "",
+      stateCode: "",
+      pincode: "",
+      phone: "",
+      email: "",
+      gstin: "",
+      pan: "",
+      bankName: "",
+      bankAccount: "",
+      ifsc: "",
+      invoicePrefix: "SGD",
+      nextInvoiceNo: 1,
+      makingGstMode: "SEPARATE_5",
+      terms: "",
+    };
   }
   return shop;
 }

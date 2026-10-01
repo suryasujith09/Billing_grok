@@ -3,7 +3,8 @@ import { listOrnaments } from "@/lib/queries";
 import { grams, inr, num } from "@/lib/money";
 import { CATEGORIES, labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
-import { Edit, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
+import { InventoryTagActions } from "@/components/inventory-tag-actions";
 
 export default async function InventoryPage({
   searchParams,
@@ -21,12 +22,27 @@ export default async function InventoryPage({
   const totalNetWeight = ornaments.reduce((sum, item) => sum + num(item.netWeight), 0);
   const totalGrossWeight = ornaments.reduce((sum, item) => sum + num(item.grossWeight), 0);
 
+  const mappedItems = ornaments.map((item) => ({
+    id: item.id,
+    tagNo: item.tagNo,
+    name: item.name,
+    category: item.category,
+    metal: item.metal,
+    purity: item.purity,
+    grossWeight: num(item.grossWeight),
+    netWeight: num(item.netWeight),
+    stoneWeight: num(item.stoneWeight),
+    huid: item.huid,
+    printCount: item.printCount ?? 0,
+    lastPrintedAt: item.lastPrintedAt,
+  }));
+
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Stock Control"
-        title="Jewellery Inventory"
-        subtitle="Track tagged stock, HUID hallmarking, weights, making charges, and status."
+        eyebrow="Stock Control & Barcode Tagging"
+        title="Jewellery Inventory & Tag Printing"
+        subtitle="Track tagged stock, HUID hallmarking, weights, TVS LP 46 Dlite thermal barcode printing, and audit history."
         actions={
           <Link href="/inventory/new">
             <Button variant="primary">
@@ -98,84 +114,8 @@ export default async function InventoryPage({
         </div>
       </div>
 
-      {/* Stock Table */}
-      <Card padded={false}>
-        {ornaments.length === 0 ? (
-          <div className="p-8 text-center text-sm text-stone">
-            No stock pieces found matching criteria.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-sand bg-cream/50 text-[11px] font-semibold tracking-wider text-stone uppercase">
-                  <th className="px-5 py-3">Tag #</th>
-                  <th className="px-5 py-3">Ornament</th>
-                  <th className="px-5 py-3">Metal / Purity</th>
-                  <th className="px-5 py-3">HUID</th>
-                  <th className="px-5 py-3 text-right">Gross Wt</th>
-                  <th className="px-5 py-3 text-right">Net Wt</th>
-                  <th className="px-5 py-3 text-right">Making</th>
-                  <th className="px-5 py-3 text-center">Status</th>
-                  <th className="px-5 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-sand/60">
-                {ornaments.map((item) => (
-                  <tr key={item.id} className="hover:bg-sand/20 transition">
-                    <td className="px-5 py-3.5 font-bold tabular text-wine uppercase">
-                      {item.tagNo}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-medium text-ink">{item.name}</p>
-                      <p className="text-xs text-stone">{labelize(item.category)}</p>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-stone">
-                      <span className="font-semibold text-ink">{item.metal}</span> ({item.purity})
-                    </td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-stone">
-                      {item.huid || "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-right tabular text-stone">
-                      {grams(num(item.grossWeight))}
-                    </td>
-                    <td className="px-5 py-3.5 text-right tabular font-semibold text-ink">
-                      {grams(num(item.netWeight))}
-                    </td>
-                    <td className="px-5 py-3.5 text-right tabular text-xs text-stone">
-                      {item.makingType === "PER_GRAM"
-                        ? `${inr(num(item.makingValue))}/g`
-                        : item.makingType === "PERCENT"
-                        ? `${item.makingValue}%`
-                        : inr(num(item.makingValue))}
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          item.status === "IN_STOCK"
-                            ? "bg-ok/10 text-ok"
-                            : "bg-stone/10 text-stone"
-                        }`}
-                      >
-                        {item.status.replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <Link
-                        href={`/inventory/${item.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-wine hover:underline"
-                      >
-                        <Edit size={14} />
-                        Edit
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {/* Tag Printing & Interactive Inventory Table */}
+      <InventoryTagActions items={mappedItems} />
     </div>
   );
 }

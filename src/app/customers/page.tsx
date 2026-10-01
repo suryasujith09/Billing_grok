@@ -92,7 +92,7 @@ export default async function CustomersPage({
                     <td className="px-5 py-3.5 text-right">
                       <Link
                         href={`/customers/${c.id}`}
-                        className="text-xs font-semibold text-wine hover:underline"
+                        className="text-xs font-semibold text-royal hover:underline"
                       >
                         Profile & History
                       </Link>

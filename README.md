@@ -1,5 +1,24 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Database setup
+
+Set `DATABASE_URL` to the PostgreSQL connection string for the target database.
+For a new database, run `npm run db:migrate` to create the schema and apply the
+printer and tag-tracking changes.
+
+If the database already has the original Billing Grok schema (for example, it
+was created from `supabase_setup.sql`), baseline that existing schema once, then
+apply the new migration:
+
+```bash
+npx prisma migrate resolve --applied 20261001130000_init
+npx prisma migrate deploy
+```
+
+Do not baseline an empty database; use `npm run db:migrate` instead. Production
+deployments should use `npx prisma migrate deploy` after the existing database
+has been baselined.
+
 ## Getting Started
 
 First, run the development server:

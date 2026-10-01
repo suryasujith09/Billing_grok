@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, Receipt } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import type { Role } from "@/lib/session";
@@ -20,6 +21,12 @@ export function ClientShell({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  // If on login route, render full screen without sidebar/board ticker
+  if (pathname.startsWith("/login")) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-cream">
@@ -33,7 +40,7 @@ export function ClientShell({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Mobile Navigation Header */}
-          <header className="no-print sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-wine-deep px-4 py-3 text-cream md:hidden">
+          <header className="no-print sticky top-0 z-30 flex items-center justify-between border-b border-white/10 bg-royal-deep px-4 py-3 text-cream md:hidden">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -43,11 +50,16 @@ export function ClientShell({
               >
                 <Menu size={22} />
               </button>
-              <div>
-                <p className="text-[9px] tracking-[0.2em] text-gold-soft uppercase">Jewellery house</p>
-                <p className="font-display max-w-[170px] truncate text-base font-semibold text-gold-bright sm:max-w-xs">
-                  {shopName}
-                </p>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 border border-gold/40 p-0.5">
+                  <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+                </div>
+                <div>
+                  <p className="text-[9px] tracking-[0.2em] text-gold-soft uppercase">Jewellery house</p>
+                  <p className="font-display max-w-[170px] truncate text-base font-semibold text-gold-bright sm:max-w-xs">
+                    {shopName}
+                  </p>
+                </div>
               </div>
             </div>
             <Link

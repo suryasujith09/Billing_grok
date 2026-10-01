@@ -8,26 +8,26 @@ datasource db {
 }
 
 model Shop {
-  id              String  @id @default("default")
-  name            String
-  logoUrl         String  @default("")
-  legalName       String  @default("")
-  address         String  @default("")
-  city            String  @default("")
-  state           String  @default("")
-  stateCode       String  @default("")
-  pincode         String  @default("")
-  phone           String  @default("")
-  email           String  @default("")
-  gstin           String  @default("")
-  pan             String  @default("")
-  bankName        String  @default("")
-  bankAccount     String  @default("")
-  ifsc            String  @default("")
-  invoicePrefix   String  @default("SGD")
-  nextInvoiceNo   Int     @default(1)
-  makingGstMode   String  @default("SEPARATE_5")
-  terms           String  @default("")
+  id            String  @id @default("default")
+  name          String
+  logoUrl       String  @default("")
+  legalName     String  @default("")
+  address       String  @default("")
+  city          String  @default("")
+  state         String  @default("")
+  stateCode     String  @default("")
+  pincode       String  @default("")
+  phone         String  @default("")
+  email         String  @default("")
+  gstin         String  @default("")
+  pan           String  @default("")
+  bankName      String  @default("")
+  bankAccount   String  @default("")
+  ifsc          String  @default("")
+  invoicePrefix String  @default("SGD")
+  nextInvoiceNo Int     @default(1)
+  makingGstMode String  @default("SEPARATE_5")
+  terms         String  @default("")
 }
 
 model MetalRate {
@@ -75,6 +75,20 @@ model Ornament {
   costPrice       Decimal?
   status          String        @default("IN_STOCK")
   notes           String        @default("")
+  companyId       String        @default("default")
+  branchId        String        @default("main")
+  productCode     String        @default("")
+  subcategory     String        @default("")
+  stoneDetails    String        @default("")
+  stoneUnit       String        @default("CTS")
+  diamondCarat    Decimal       @default(0)
+  diamondPieces   Int           @default(0)
+  mrp             Decimal?
+  supplier        String        @default("")
+  labelTemplateId String?
+  lastPrintedAt   DateTime?
+  printCount      Int           @default(0)
+  printedBy       String        @default("")
   createdAt       DateTime      @default(now())
   invoiceItems    InvoiceItem[]
 }
@@ -170,4 +184,70 @@ model Payment {
   amount    Decimal
   reference String   @default("")
   paidAt    DateTime @default(now())
+}
+
+model PrinterSettings {
+  id             String   @id @default(cuid())
+  shopId         String   @default("default")
+  printerName    String   @default("TVS LP 46 Dlite")
+  driverMode     String   @default("TSPL")
+  connectionType String   @default("AGENT")
+  density        Int      @default(10)
+  speed          Int      @default(4)
+  orientation    Int      @default(0)
+  offsetX        Int      @default(0)
+  offsetY        Int      @default(0)
+  copies         Int      @default(1)
+  labelWidthMm   Float    @default(60)
+  labelHeightMm  Float    @default(25)
+  gapMm          Float    @default(3)
+  agentUrl       String   @default("http://127.0.0.1:9191")
+  agentToken     String   @default("surya-print-secret-token")
+  isDefault      Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+}
+
+model LabelTemplate {
+  id               String   @id @default(cuid())
+  shopId           String   @default("default")
+  name             String
+  category         String   @default("GENERAL")
+  widthMm          Float    @default(60)
+  heightMm         Float    @default(25)
+  gapMm            Float    @default(3)
+  columnsAcross    Int      @default(1)
+  rollWidthMm      Float    @default(60)
+  colGapMm         Float    @default(2)
+  leftWingWidthMm  Float    @default(28)
+  rightWingWidthMm Float    @default(28)
+  tailWidthMm      Float    @default(4)
+  elements         String
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PrintLog {
+  id           String   @id @default(cuid())
+  shopId       String   @default("default")
+  ornamentId   String?
+  tagNo        String
+  printerName  String
+  templateId   String?
+  printedBy    String   @default("system")
+  status       String   @default("SUCCESS")
+  copies       Int      @default(1)
+  errorMessage String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+model TagSequence {
+  id        String   @id @default(cuid())
+  shopId    String
+  prefix    String
+  year      Int
+  nextVal   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, prefix, year])
 }

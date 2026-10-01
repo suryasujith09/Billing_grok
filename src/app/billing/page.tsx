@@ -2,6 +2,8 @@ import { getLatestRates, getShop } from "@/lib/queries";
 import { BillingDesk } from "@/components/billing-desk";
 import { PageHeader } from "@/components/ui";
 
+import type { MakingGstMode } from "@/lib/invoice-calc";
+
 export default async function BillingPage() {
   const [shop, rates] = await Promise.all([getShop(), getLatestRates()]);
   const rateRows = rates.map((r) => ({
@@ -19,7 +21,7 @@ export default async function BillingPage() {
       />
       <BillingDesk
         rates={rateRows}
-        makingGstMode={shop.makingGstMode as any}
+        makingGstMode={shop.makingGstMode as MakingGstMode}
         placeOfSupply={shop.state}
       />
     </div>

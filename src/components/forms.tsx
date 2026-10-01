@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   CATEGORIES,
@@ -32,7 +32,6 @@ function Submit({ children }: { children: string }) {
   );
 }
 
-import { useState } from "react";
 import { Image as ImageIcon, Printer } from "lucide-react";
 
 export function PrintDownloadButton() {
@@ -79,7 +78,7 @@ export function ShopForm({
     <form action={action} className="space-y-6">
       {/* Logo Branding Section */}
       <div className="rounded-lg border border-sand bg-cream/40 p-4">
-        <div className="flex items-center gap-2 mb-2 text-wine font-semibold">
+        <div className="flex items-center gap-2 mb-2 text-royal font-semibold">
           <ImageIcon size={18} />
           <h3 className="font-display text-base">Jewellery House Logo</h3>
         </div>
@@ -105,7 +104,7 @@ export function ShopForm({
                     reader.readAsDataURL(file);
                   }
                 }}
-                className="w-full text-xs text-stone file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-wine file:text-cream hover:file:bg-wine-deep cursor-pointer"
+                className="w-full text-xs text-stone file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-royal file:text-cream hover:file:bg-royal-deep cursor-pointer"
               />
             </Field>
 
@@ -121,14 +120,14 @@ export function ShopForm({
               <span className="text-stone font-medium">Sample Logos:</span>
               <button
                 type="button"
-                className="text-wine underline hover:text-ink font-mono text-[11px]"
+                className="text-royal underline hover:text-ink font-mono text-[11px]"
                 onClick={() => setLogo("https://images.unsplash.com/photo-1611591475143-be232935ee37?w=150&auto=format&fit=crop&q=80")}
               >
                 Gold Crest Emblem
               </button>
               <button
                 type="button"
-                className="text-wine underline hover:text-ink font-mono text-[11px]"
+                className="text-royal underline hover:text-ink font-mono text-[11px]"
                 onClick={() => setLogo("https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=150&auto=format&fit=crop&q=80")}
               >
                 Diamond Crown
@@ -454,7 +453,7 @@ export function OrnamentForm({
 }
 
 export function CancelInvoiceButton({ id }: { id: string }) {
-  const [pending, setPending] = usePendingFlag();
+  const [pending, setPending] = useState(false);
   return (
     <Button
       type="button"
@@ -472,11 +471,6 @@ export function CancelInvoiceButton({ id }: { id: string }) {
       {pending ? "Cancelling…" : "Cancel invoice"}
     </Button>
   );
-}
-
-function usePendingFlag() {
-  const { useState } = require("react") as typeof import("react");
-  return useState(false);
 }
 
 export function CollectPaymentForm({ invoiceId, balance }: { invoiceId: string; balance: number }) {

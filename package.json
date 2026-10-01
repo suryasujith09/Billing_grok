@@ -6,8 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "tsx src/lib/barcode-tagging.test.ts",
+    "print-agent": "node src/print-agent/index.mjs",
     "postinstall": "prisma generate",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",

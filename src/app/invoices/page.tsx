@@ -155,7 +155,7 @@ export default async function InvoicesPage({
                     <td className="px-5 py-3.5 text-right whitespace-nowrap">
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="text-xs font-semibold text-wine hover:underline"
+                        className="text-xs font-semibold text-royal hover:underline"
                       >
                         View & Print
                       </Link>

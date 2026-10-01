@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { reportForRange } from "@/lib/queries";
-import { formatDate, grams, inr, todayISO } from "@/lib/money";
+import { formatDate, grams, inr, num, todayISO } from "@/lib/money";
 import { labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Stat } from "@/components/ui";
 import { Calendar, Filter, PieChart, ShoppingBag } from "lucide-react";
@@ -111,7 +111,7 @@ export default async function ReportsPage({
             </div>
             <div className="flex justify-between pt-2 text-base font-bold">
               <span className="text-ink">Total Tax Collected</span>
-              <span className="tabular text-wine">
+              <span className="tabular text-royal">
                 {inr(totals.cgst3 + totals.sgst3 + totals.cgst5 + totals.sgst5)}
               </span>
             </div>
@@ -188,6 +188,96 @@ export default async function ReportsPage({
           </div>
         </Card>
       </div>
+
+      {/* Invoice Register for the Period */}
+      <Card padded={false}>
+        <div className="border-b border-sand px-5 py-4 flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold text-ink flex items-center gap-2">
+            <ShoppingBag size={18} />
+            Invoice Register
+          </h2>
+          <span className="text-xs font-semibold text-stone">{report.invoices.length} invoice(s)</span>
+        </div>
+        {report.invoices.length === 0 ? (
+          <div className="p-8 text-center text-sm text-stone">
+            No invoices in selected period.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-sand bg-cream/50 text-[11px] font-semibold tracking-wider text-stone uppercase">
+                  <th className="px-5 py-3">Date</th>
+                  <th className="px-5 py-3">Invoice #</th>
+                  <th className="px-5 py-3">Customer</th>
+                  <th className="px-5 py-3 text-right">Items</th>
+                  <th className="px-5 py-3 text-right">Grand Total</th>
+                  <th className="px-5 py-3 text-right">GST</th>
+                  <th className="px-5 py-3 text-right">Old Gold</th>
+                  <th className="px-5 py-3 text-right">Net Payable</th>
+                  <th className="px-5 py-3 text-right">Paid</th>
+                  <th className="px-5 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sand/60">
+                {report.invoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-sand/20 transition">
+                    <td className="px-5 py-3 whitespace-nowrap text-xs text-stone">
+                      {formatDate(inv.date)}
+                    </td>
+                    <td className="px-5 py-3 font-medium tabular text-ink">
+                      {inv.invoiceNo}
+                    </td>
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-ink">{inv.customerName}</p>
+                      <p className="text-xs text-stone">{inv.customerPhone || "—"}</p>
+                    </td>
+                    <td className="px-5 py-3 text-right tabular text-stone text-xs">
+                      {inv.items.length}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular font-medium text-ink">
+                      {inr(num(inv.grandTotal))}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular text-xs text-stone">
+                      {inr(num(inv.cgst3) + num(inv.sgst3) + num(inv.cgst5) + num(inv.sgst5))}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular text-stone">
+                      {num(inv.oldGoldValue) > 0 ? inr(num(inv.oldGoldValue)) : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular font-semibold text-ink">
+                      {inr(num(inv.netPayable))}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular font-medium text-ok">
+                      {inr(num(inv.paidAmount))}
+                    </td>
+                    <td className="px-5 py-3 text-right whitespace-nowrap">
+                      <Link
+                        href={`/invoices/${inv.id}`}
+                        className="text-xs font-semibold text-royal hover:underline"
+                      >
+                        View →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-sand bg-cream/70 text-xs font-semibold">
+                  <td className="px-5 py-3 text-stone" colSpan={4}>Totals</td>
+                  <td className="px-5 py-3 text-right tabular text-ink">{inr(totals.grand)}</td>
+                  <td className="px-5 py-3 text-right tabular text-ink">
+                    {inr(totals.cgst3 + totals.sgst3 + totals.cgst5 + totals.sgst5)}
+                  </td>
+                  <td className="px-5 py-3 text-right tabular text-stone">{inr(totals.oldGold)}</td>
+                  <td className="px-5 py-3 text-right tabular text-ink">{inr(totals.net)}</td>
+                  <td className="px-5 py-3 text-right tabular text-ok">{inr(totals.paid)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

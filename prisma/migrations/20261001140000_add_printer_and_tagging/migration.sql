@@ -84,5 +84,10 @@ CREATE TABLE "TagSequence" (
     CONSTRAINT "TagSequence_pkey" PRIMARY KEY ("id")
 );
 
+ALTER TABLE "PrinterSettings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LabelTemplate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PrintLog" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "TagSequence" ENABLE ROW LEVEL SECURITY;
+
 CREATE UNIQUE INDEX "TagSequence_shopId_prefix_year_key"
 ON "TagSequence"("shopId", "prefix", "year");

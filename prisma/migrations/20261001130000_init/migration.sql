@@ -180,6 +180,17 @@ CREATE TABLE "Payment" (
     CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
 );
 
+-- All access to the application database goes through the server-side Prisma connection.
+-- Keep public-schema tables inaccessible to Supabase Data API roles by default.
+ALTER TABLE "Shop" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "MetalRate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Customer" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Ornament" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Invoice" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "InvoiceItem" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "OldGoldItem" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Payment" ENABLE ROW LEVEL SECURITY;
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Ornament_tagNo_key" ON "Ornament"("tagNo");
 

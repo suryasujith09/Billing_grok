@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import JsBarcode from "jsbarcode";
 import {
   saveLabelTemplateAction,
   deleteLabelTemplateAction,
@@ -43,6 +44,37 @@ interface LabelDesignerProps {
     tailWidthMm?: number | null;
     elements: string | LabelElement[];
   }>;
+}
+
+function Code128Preview({ value, width, height }: { value: string; width: number; height: number }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!svgRef.current) return;
+    try {
+      JsBarcode(svgRef.current, value, {
+        format: "CODE128",
+        displayValue: false,
+        width: 1.5,
+        height: 38,
+        margin: 2,
+      });
+    } catch {
+      svgRef.current.replaceChildren();
+    }
+  }, [value]);
+
+  return (
+    <svg
+      ref={svgRef}
+      width={`${width}px`}
+      height={`${height}px`}
+      role="img"
+      aria-label={`Code 128 barcode preview for ${value}`}
+      className="bg-white"
+      preserveAspectRatio="none"
+    />
+  );
 }
 
 const SAMPLE_DEMO_ITEM = {
@@ -525,26 +557,11 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                         >
                           {elem.fieldKey === "barcode" ? (
                             <div className="flex flex-col items-center bg-white p-0.5 border border-black/40 shadow-xs">
-                              {/* Vector Barcode rendering */}
-                              <svg
-                                width={`${(elem.widthMm || 24) * SCALE}`}
-                                height={`${(elem.heightMm || 10) * SCALE}`}
-                                viewBox="0 0 100 40"
-                                preserveAspectRatio="none"
-                              >
-                                <rect x="0" y="0" width="4" height="40" fill="black" />
-                                <rect x="6" y="0" width="2" height="40" fill="black" />
-                                <rect x="12" y="0" width="6" height="40" fill="black" />
-                                <rect x="22" y="0" width="2" height="40" fill="black" />
-                                <rect x="28" y="0" width="8" height="40" fill="black" />
-                                <rect x="40" y="0" width="3" height="40" fill="black" />
-                                <rect x="46" y="0" width="5" height="40" fill="black" />
-                                <rect x="56" y="0" width="2" height="40" fill="black" />
-                                <rect x="62" y="0" width="7" height="40" fill="black" />
-                                <rect x="74" y="0" width="3" height="40" fill="black" />
-                                <rect x="82" y="0" width="6" height="40" fill="black" />
-                                <rect x="92" y="0" width="4" height="40" fill="black" />
-                              </svg>
+                              <Code128Preview
+                                value={SAMPLE_DEMO_ITEM.tagNo}
+                                width={(elem.widthMm || 24) * SCALE}
+                                height={(elem.heightMm || 10) * SCALE}
+                              />
                               <span className="text-[8px] font-mono font-bold text-black mt-0.5 tracking-tighter">
                                 {SAMPLE_DEMO_ITEM.tagNo}
                               </span>

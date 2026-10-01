@@ -369,7 +369,12 @@ export function OrnamentForm({
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
       <div className="grid gap-3 md:grid-cols-3">
         <Field label="Tag no">
-          <Input name="tagNo" defaultValue={item?.tagNo} required className="uppercase" />
+          <Input
+            name="tagNo"
+            defaultValue={item?.tagNo}
+            placeholder="Leave blank to generate automatically"
+            className="uppercase"
+          />
         </Field>
         <Field label="Name">
           <Input name="name" defaultValue={item?.name} required />

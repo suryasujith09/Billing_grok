@@ -23,7 +23,12 @@ console.log("✓ Test 3 Passed: Category codes mapped correctly");
 
 // Test 3: Barcode Format Validation
 assert.strictEqual(isValidTagBarcode("SGD26RG00001"), true, "Valid tag barcode");
+assert.strictEqual(isValidTagBarcode("sgd26rg00001"), true, "Tag validation is case-insensitive");
+assert.strictEqual(isValidTagBarcode("RG-00001"), true, "Hyphens are valid Code 128 tag characters");
 assert.strictEqual(isValidTagBarcode(""), false, "Empty tag is invalid");
+assert.strictEqual(isValidTagBarcode("A B C"), false, "Whitespace is invalid in barcode values");
+assert.strictEqual(isValidTagBarcode("TAG\"001"), false, "Quotes are invalid in TSPL barcode values");
+assert.strictEqual(isValidTagBarcode("A".repeat(31)), false, "Overlong barcode values are rejected");
 console.log("✓ Test 4 Passed: Code 128 barcode validation works");
 
 // Test 4: TSPL Command Generator for TVS LP 46 Dlite

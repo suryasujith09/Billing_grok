@@ -14,7 +14,7 @@ import {
 import { financialYear, num, padInvoice, r2 } from "./money";
 import { getLatestRates, getShop } from "./queries";
 
-import { generateUniqueTagId } from "./tag-generator";
+import { generateUniqueTagId, isValidTagBarcode } from "./tag-generator";
 
 const ornamentSchema = z.object({
   tagNo: z.string().optional().default(""),
@@ -218,6 +218,13 @@ export async function saveOrnamentAction(
     tagNo = await generateUniqueTagId({ category });
   }
 
+  if (!isValidTagBarcode(tagNo)) {
+    return {
+      ok: false,
+      error: "Tag number must be 3–30 letters, numbers, hyphens, or underscores to print as a Code 128 barcode.",
+    };
+  }
+
   const parsed = ornamentSchema.safeParse({
     tagNo,
     name: formData.get("name"),
@@ -254,12 +261,11 @@ export async function saveOrnamentAction(
   const id = String(formData.get("id") ?? "");
   const data = parsed.data;
 
+  let saved;
   try {
-    const saved = id
+    saved = id
       ? await prisma.ornament.update({ where: { id }, data })
       : await prisma.ornament.create({ data });
-    revalidatePath("/inventory");
-    redirect(`/inventory/${saved.id}`);
   } catch (error) {
     const message = String(error);
     if (message.includes("Unique constraint")) {
@@ -267,6 +273,9 @@ export async function saveOrnamentAction(
     }
     return { ok: false, error: error instanceof Error ? error.message : "Could not save item" };
   }
+
+  revalidatePath("/inventory");
+  redirect(`/inventory/${saved.id}`);
 }
 
 export async function lookupTagAction(tagNo: string) {

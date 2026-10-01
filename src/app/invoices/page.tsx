@@ -7,18 +7,29 @@ import { Plus, Receipt, Search } from "lucide-react";
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? "";
   const fromDate = params.from ? new Date(params.from) : undefined;
   const toDate = params.to ? new Date(params.to) : undefined;
 
-  const invoices = await listInvoices({ q, from: fromDate, to: toDate });
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const result = await listInvoices({ q, from: fromDate, to: toDate, page });
+  const invoices = result.items;
 
-  const totalNet = invoices.reduce((sum, i) => sum + num(i.netPayable), 0);
-  const totalPaid = invoices.reduce((sum, i) => sum + num(i.paidAmount), 0);
-  const totalBalance = invoices.reduce((sum, i) => sum + num(i.balanceAmount), 0);
+  const totalNet = result.totals.net;
+  const totalPaid = result.totals.paid;
+  const totalBalance = result.totals.balance;
+  const pageCount = Math.max(1, Math.ceil(result.count / result.pageSize));
+  const pageUrl = (nextPage: number) => {
+    const query = new URLSearchParams();
+    if (q) query.set("q", q);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    query.set("page", String(nextPage));
+    return `/invoices?${query.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -74,7 +85,7 @@ export default async function InvoicesPage({
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <div className="rounded-lg border border-sand bg-paper p-3.5 sm:p-4">
           <p className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-stone uppercase">Bills Found</p>
-          <p className="font-display mt-1 text-xl sm:text-2xl font-semibold text-ink">{invoices.length}</p>
+          <p className="font-display mt-1 text-xl sm:text-2xl font-semibold text-ink">{result.count}</p>
         </div>
         <div className="rounded-lg border border-sand bg-paper p-3.5 sm:p-4">
           <p className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-stone uppercase">Total Sales Net</p>
@@ -167,6 +178,17 @@ export default async function InvoicesPage({
           </div>
         )}
       </Card>
+      {result.count > 0 ? (
+        <div className="flex items-center justify-between gap-3 text-xs text-stone">
+          <span>
+            Showing {(page - 1) * result.pageSize + 1}–{Math.min(page * result.pageSize, result.count)} of {result.count} invoices
+          </span>
+          <div className="flex gap-2">
+            {page > 1 ? <Link className="rounded border border-sand px-3 py-2 hover:bg-paper" href={pageUrl(page - 1)}>Previous</Link> : null}
+            {page < pageCount ? <Link className="rounded border border-sand px-3 py-2 hover:bg-paper" href={pageUrl(page + 1)}>Next</Link> : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

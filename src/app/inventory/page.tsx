@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listOrnaments } from "@/lib/queries";
-import { grams, inr, num } from "@/lib/money";
+import { grams, num } from "@/lib/money";
 import { CATEGORIES, labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { Plus, Search } from "lucide-react";
@@ -9,18 +9,20 @@ import { InventoryTagActions } from "@/components/inventory-tag-actions";
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? "";
   const category = params.category ?? "";
   const status = params.status ?? "IN_STOCK";
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
 
-  const ornaments = await listOrnaments({ q, category, status: status || undefined });
+  const result = await listOrnaments({ q, category, status: status || undefined, page });
+  const ornaments = result.items;
 
-  const totalPieces = ornaments.length;
-  const totalNetWeight = ornaments.reduce((sum, item) => sum + num(item.netWeight), 0);
-  const totalGrossWeight = ornaments.reduce((sum, item) => sum + num(item.grossWeight), 0);
+  const totalPieces = result.count;
+  const totalNetWeight = result.totalNetWeight;
+  const totalGrossWeight = result.totalGrossWeight;
 
   const mappedItems = ornaments.map((item) => ({
     id: item.id,
@@ -36,6 +38,15 @@ export default async function InventoryPage({
     printCount: item.printCount ?? 0,
     lastPrintedAt: item.lastPrintedAt,
   }));
+  const pageCount = Math.max(1, Math.ceil(result.count / result.pageSize));
+  const pageUrl = (nextPage: number) => {
+    const query = new URLSearchParams();
+    if (q) query.set("q", q);
+    if (category) query.set("category", category);
+    if (status) query.set("status", status);
+    query.set("page", String(nextPage));
+    return `/inventory?${query.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -116,6 +127,17 @@ export default async function InventoryPage({
 
       {/* Tag Printing & Interactive Inventory Table */}
       <InventoryTagActions items={mappedItems} />
+      {result.count > 0 ? (
+        <div className="flex items-center justify-between gap-3 text-xs text-stone">
+          <span>
+            Showing {(page - 1) * result.pageSize + 1}–{Math.min(page * result.pageSize, result.count)} of {result.count} items
+          </span>
+          <div className="flex gap-2">
+            {page > 1 ? <Link className="rounded border border-sand px-3 py-2 hover:bg-paper" href={pageUrl(page - 1)}>Previous</Link> : null}
+            {page < pageCount ? <Link className="rounded border border-sand px-3 py-2 hover:bg-paper" href={pageUrl(page + 1)}>Next</Link> : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

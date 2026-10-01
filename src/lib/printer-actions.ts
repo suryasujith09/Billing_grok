@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "./db";
+import { isValidTagBarcode } from "./tag-generator";
 import { getSession } from "./session";
 import {
   DEFAULT_TEMPLATES,
@@ -321,6 +322,9 @@ export async function printTagAction(opts: {
 
   if (!ornament) {
     return { ok: false, error: "Jewellery item not found for printing" };
+  }
+  if (!isValidTagBarcode(ornament.tagNo)) {
+    return { ok: false, error: `Tag ${ornament.tagNo} is not a valid Code 128 barcode value. Edit the tag number before printing.` };
   }
 
   // Fetch or resolve template

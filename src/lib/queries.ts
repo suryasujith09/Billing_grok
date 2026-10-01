@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { endOfDay, num, startOfDay } from "./money";
+import { cache } from "react";
 
-export async function getShop() {
+export const getShop = cache(async function getShop() {
   const shop = await prisma.shop.findUnique({ where: { id: "default" } });
   if (!shop) {
     // Return a safe default on first boot before seed/setup is run
@@ -29,9 +30,9 @@ export async function getShop() {
     };
   }
   return shop;
-}
+});
 
-export async function getLatestRates() {
+export const getLatestRates = cache(async function getLatestRates() {
   const rows = await prisma.metalRate.findMany({
     orderBy: { effectiveFrom: "desc" },
   });
@@ -44,7 +45,7 @@ export async function getLatestRates() {
     if (a.metal !== b.metal) return a.metal.localeCompare(b.metal);
     return a.purity.localeCompare(b.purity);
   });
-}
+});
 
 export function rateMap(rates: Awaited<ReturnType<typeof getLatestRates>>) {
   const map: Record<string, number> = {};
@@ -91,10 +92,10 @@ export async function listOrnaments(opts?: {
   q?: string;
   status?: string;
   category?: string;
+  page?: number;
 }) {
   const q = opts?.q?.trim();
-  return prisma.ornament.findMany({
-    where: {
+  const where = {
       ...(opts?.status ? { status: opts.status } : {}),
       ...(opts?.category ? { category: opts.category } : {}),
       ...(q
@@ -106,9 +107,25 @@ export async function listOrnaments(opts?: {
             ],
           }
         : {}),
-    },
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-  });
+    };
+  const pageSize = 50;
+  const [items, count, weights] = await Promise.all([
+    prisma.ornament.findMany({
+      where,
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+      take: pageSize,
+      skip: ((opts?.page ?? 1) - 1) * pageSize,
+    }),
+    prisma.ornament.count({ where }),
+    prisma.ornament.aggregate({ where, _sum: { grossWeight: true, netWeight: true } }),
+  ]);
+  return {
+    items,
+    count,
+    pageSize,
+    totalGrossWeight: num(weights._sum.grossWeight),
+    totalNetWeight: num(weights._sum.netWeight),
+  };
 }
 
 export async function getOrnamentByTag(tagNo: string) {
@@ -117,10 +134,9 @@ export async function getOrnamentByTag(tagNo: string) {
   });
 }
 
-export async function listInvoices(opts?: { q?: string; from?: Date; to?: Date }) {
+export async function listInvoices(opts?: { q?: string; from?: Date; to?: Date; page?: number }) {
   const q = opts?.q?.trim();
-  return prisma.invoice.findMany({
-    where: {
+  const where = {
       ...(opts?.from || opts?.to
         ? {
             date: {
@@ -138,10 +154,32 @@ export async function listInvoices(opts?: { q?: string; from?: Date; to?: Date }
             ],
           }
         : {}),
+    };
+  const pageSize = 50;
+  const [items, count, totals] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { id: "desc" }],
+      take: pageSize,
+      skip: ((opts?.page ?? 1) - 1) * pageSize,
+      include: { items: { select: { id: true } } },
+    }),
+    prisma.invoice.count({ where }),
+    prisma.invoice.aggregate({
+      where,
+      _sum: { netPayable: true, paidAmount: true, balanceAmount: true },
+    }),
+  ]);
+  return {
+    items,
+    count,
+    pageSize,
+    totals: {
+      net: num(totals._sum.netPayable),
+      paid: num(totals._sum.paidAmount),
+      balance: num(totals._sum.balanceAmount),
     },
-    orderBy: { date: "desc" },
-    include: { payments: true, items: true, exchanges: true },
-  });
+  };
 }
 
 export async function getInvoice(id: string) {
@@ -155,16 +193,21 @@ export async function dashboardStats() {
   const todayStart = startOfDay(new Date());
   const todayEnd = endOfDay(new Date());
 
-  const [todayInvoices, stock, outstanding, recent, rates, shop] =
+  const [today, stock, outstanding, recent, rates, shop] =
     await Promise.all([
-      prisma.invoice.findMany({
+      prisma.invoice.aggregate({
         where: {
           status: "FINAL",
           date: { gte: todayStart, lte: todayEnd },
         },
-        include: { items: true, exchanges: true, payments: true },
+        _count: { _all: true },
+        _sum: { grandTotal: true, netPayable: true, oldGoldValue: true, paidAmount: true },
       }),
-      prisma.ornament.findMany({ where: { status: "IN_STOCK" } }),
+      prisma.ornament.aggregate({
+        where: { status: "IN_STOCK" },
+        _count: { _all: true },
+        _sum: { netWeight: true },
+      }),
       prisma.invoice.findMany({
         where: { status: "FINAL", balanceAmount: { gt: 0 } },
         orderBy: { date: "desc" },
@@ -178,25 +221,19 @@ export async function dashboardStats() {
       getShop(),
     ]);
 
-  const sales = todayInvoices.reduce((s, inv) => s + num(inv.grandTotal), 0);
-  const net = todayInvoices.reduce((s, inv) => s + num(inv.netPayable), 0);
-  const oldGold = todayInvoices.reduce((s, inv) => s + num(inv.oldGoldValue), 0);
-  const collected = todayInvoices.reduce((s, inv) => s + num(inv.paidAmount), 0);
-  const stockWeight = stock.reduce((s, item) => s + num(item.netWeight), 0);
-
   return {
     shop,
     rates,
     today: {
-      bills: todayInvoices.length,
-      sales,
-      net,
-      oldGold,
-      collected,
+      bills: today._count._all,
+      sales: num(today._sum.grandTotal),
+      net: num(today._sum.netPayable),
+      oldGold: num(today._sum.oldGoldValue),
+      collected: num(today._sum.paidAmount),
     },
     stock: {
-      pieces: stock.length,
-      weight: stockWeight,
+      pieces: stock._count._all,
+      weight: num(stock._sum.netWeight),
     },
     outstanding,
     recent,

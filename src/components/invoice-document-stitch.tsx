@@ -161,7 +161,7 @@ export function InvoiceDocumentStitch({
   shop: ShopDoc;
   rates?: RateDoc[];
 }) {
-  const [activeTab, setActiveTab] = useState<"side-a" | "side-b" | "both">("side-a");
+  const [activeTab, setActiveTab] = useState<"side-a" | "side-b" | "both">("both");
   const [isTermsDrawerOpen, setIsTermsDrawerOpen] = useState(false);
   const [isSealInspected, setIsSealInspected] = useState(false);
 
@@ -319,7 +319,7 @@ export function InvoiceDocumentStitch({
           id="invoice-sheet-side-a"
           className={`print-sheet relative w-full max-w-[960px] bg-white shadow-[0_16px_40px_rgba(29,27,25,0.08),0_4px_12px_rgba(29,27,25,0.04)] p-4 sm:p-8 md:p-10 transition-all duration-300 text-[#1d1b19] font-garamond ${
             isSealInspected ? "ring-4 ring-[#c59b3f] shadow-2xl" : ""
-          } ${activeTab === "both" ? "page-break-after" : ""}`}
+          }`}
         >
           {/* Centered Watermark Heraldic Emblem */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.035] overflow-hidden select-none">

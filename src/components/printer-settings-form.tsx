@@ -214,9 +214,6 @@ PRINT 1,1
                       {p.name} ({p.status}) {p.isDefault ? "[Default]" : ""}
                     </option>
                   ))}
-                  <option value="TVS LP 46 Dlite" className="bg-royal-deep text-cream">
-                    TVS LP 46 Dlite (Manual Entry)
-                  </option>
                 </select>
               ) : (
                 <input

@@ -32,20 +32,7 @@ function Submit({ children }: { children: string }) {
   );
 }
 
-import { Image as ImageIcon, Printer } from "lucide-react";
-
-export function PrintDownloadButton() {
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={() => window.print()}
-    >
-      <Printer size={16} />
-      Print / Save as PDF
-    </Button>
-  );
-}
+import { Image as ImageIcon } from "lucide-react";
 
 export function ShopForm({
   shop,

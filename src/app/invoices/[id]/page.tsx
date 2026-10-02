@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getInvoice, getLatestRates, getShop } from "@/lib/queries";
+import { getInvoice, getShop } from "@/lib/queries";
 import { inr, num } from "@/lib/money";
 import { InvoiceThemeSwitcher } from "@/components/invoice-theme-switcher";
-import { CancelInvoiceButton, CollectPaymentForm, PrintDownloadButton } from "@/components/forms";
+import { CancelInvoiceButton, CollectPaymentForm } from "@/components/forms";
 import { Card } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
 
@@ -13,11 +13,16 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [invoice, shop, rates] = await Promise.all([getInvoice(id), getShop(), getLatestRates()]);
+  const [invoice, shop] = await Promise.all([getInvoice(id), getShop()]);
 
   if (!invoice) {
     notFound();
   }
+
+  // Prisma Decimal instances cannot cross the Server/Client Component boundary.
+  // JSON serialization converts Decimal values to strings and Date values to ISO strings.
+  const invoiceForClient = JSON.parse(JSON.stringify(invoice));
+  const shopForClient = JSON.parse(JSON.stringify(shop));
 
   const balance = num(invoice.balanceAmount);
 
@@ -38,7 +43,6 @@ export default async function InvoiceDetailPage({
                 </span>
               </div>
             ) : null}
-            <PrintDownloadButton />
             {invoice.status === "FINAL" ? <CancelInvoiceButton id={invoice.id} /> : null}
           </div>
         </div>
@@ -58,7 +62,7 @@ export default async function InvoiceDetailPage({
 
       {/* Invoice Printable Document — with theme switcher */}
       <div className="overflow-x-auto max-w-full pb-4">
-        <InvoiceThemeSwitcher invoice={invoice} shop={shop} rates={rates} />
+        <InvoiceThemeSwitcher invoice={invoiceForClient} shop={shopForClient} />
       </div>
     </div>
   );

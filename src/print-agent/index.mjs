@@ -30,7 +30,7 @@ function getInstalledPrinters() {
       ]);
     }
 
-    const psScript = `Get-Printer | Select-Object Name, PrinterStatus, IsDefault | ConvertTo-Json`;
+    const psScript = `Get-CimInstance Win32_Printer | Select-Object Name, PrinterStatus, Default, WorkOffline | ConvertTo-Json -Compress`;
     const encodedScript = Buffer.from(psScript, "utf16le").toString("base64");
     const psCommand = `powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encodedScript}`;
 
@@ -45,8 +45,8 @@ function getInstalledPrinters() {
         const list = Array.isArray(parsed) ? parsed : [parsed];
         const printers = list.map((p) => ({
           name: p.Name,
-          status: p.PrinterStatus === 1 || p.PrinterStatus === 3 ? "Ready" : String(p.PrinterStatus),
-          isDefault: Boolean(p.IsDefault),
+          status: p.WorkOffline ? "Offline" : p.PrinterStatus === 3 ? "Ready" : p.PrinterStatus === 4 ? "Printing" : "Available",
+          isDefault: Boolean(p.Default),
         }));
         resolve(printers);
       } catch {

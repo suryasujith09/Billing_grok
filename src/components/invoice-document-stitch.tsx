@@ -332,7 +332,7 @@ export function InvoiceDocumentStitch({
 
           {/* Outer Double-Line Gold Architectural Framing */}
           <div className="relative w-full bg-white p-1 shadow-[0_0_0_1px_rgba(197,155,63,0.55),0_0_0_4px_#ffffff,0_0_0_5px_rgba(197,155,63,0.25)]">
-            <div className="relative w-full p-4 sm:p-6 bg-white flex flex-col gap-4">
+            <div className="invoice-side-a-content relative w-full p-4 sm:p-6 bg-white flex flex-col gap-4">
               {/* Corner Filigree SVG Accents */}
               <TopLeftFiligree />
               <TopRightFiligree />
@@ -911,7 +911,7 @@ export function InvoiceDocumentStitch({
           {/* Outer Double Filigree Decorative Framing */}
           <div className="relative z-10 w-full p-[3px] bg-[#7a5900]/20 rounded-none">
             <div className="w-full p-[2px] bg-white">
-              <div className="w-full p-4 sm:p-6 bg-white relative">
+            <div className="invoice-side-b-content w-full p-4 sm:p-6 bg-white relative">
                 {/* Corner Geometric Filigree Accents */}
                 <TopLeftFiligree />
                 <TopRightFiligree />

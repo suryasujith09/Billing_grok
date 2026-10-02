@@ -99,7 +99,7 @@ input[type="number"] {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 5mm 7mm;
+    margin: 4mm 5mm;
   }
 
   *,
@@ -131,6 +131,115 @@ input[type="number"] {
     width: 100% !important;
     padding: 0 !important;
     margin: 0 auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* Keep the invoice front and terms back compact enough for one A4 sheet each. */
+  #invoice-sheet-side-a .invoice-side-a-content {
+    padding: 2mm !important;
+    gap: 2mm !important;
+    line-height: 1.12 !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="p-4"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="p-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="p-2"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="p-1.5"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="px-5"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="px-4"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="px-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="px-2.5"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="px-2"] {
+    padding: 1mm !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mt-1"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mt-2"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mt-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mt-4"] {
+    margin-block-start: 1mm !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mb-1"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mb-2"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mb-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="mb-4"] {
+    margin-block-end: 1mm !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="my-5"] {
+    margin-block: 1mm !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="gap-2"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="gap-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="gap-4"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="gap-x-3"],
+  #invoice-sheet-side-a .invoice-side-a-content [class~="gap-y-1"] {
+    gap: 1mm !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="md:grid-cols-12"] {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="md:col-span-7"] {
+    grid-column: span 7 / span 7 !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content [class~="md:col-span-5"] {
+    grid-column: span 5 / span 5 !important;
+  }
+
+  #invoice-sheet-side-a .invoice-side-a-content > .flex:first-of-type img {
+    max-height: 15mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content {
+    padding: 2mm !important;
+    line-height: 1.12 !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content main {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 2mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content > div > div,
+  #invoice-sheet-side-b .invoice-side-b-content [class~="p-4"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="p-3"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="p-2"] {
+    padding: 1mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content [class~="gap-3"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="gap-2"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="gap-1.5"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="gap-1"] {
+    gap: 1mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content [class~="mt-1"],
+  #invoice-sheet-side-b .invoice-side-b-content [class~="mt-4"] {
+    margin-block-start: 0.5mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content [class~="my-1"] {
+    margin-block: 0.5mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content [class~="mb-1"] {
+    margin-block-end: 0.5mm !important;
+  }
+
+  #invoice-sheet-side-b .invoice-side-b-content [class~="space-y-1"] > :not(:last-child),
+  #invoice-sheet-side-b .invoice-side-b-content [class~="space-y-0.5"] > :not(:last-child) {
+    margin-block-end: 0.5mm !important;
   }
 
   /* Ensure all backgrounds print */

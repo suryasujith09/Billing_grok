@@ -2,6 +2,10 @@ import Link from "next/link";
 import { dashboardStats } from "@/lib/queries";
 import { grams, inr, formatDate } from "@/lib/money";
 import { Button, Card, PageHeader, Stat } from "@/components/ui";
+import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/session";
+import { connection } from "next/server";
+import { indiaDayBounds } from "@/lib/india-time";
 import {
   BookOpen,
   Gem,
@@ -14,7 +18,22 @@ import {
 } from "lucide-react";
 
 export default async function DashboardPage() {
+  await connection();
   const stats = await dashboardStats();
+  const session = await getSession();
+  const { start: today, end: tomorrow } = indiaDayBounds();
+  const staff = session?.role === "admin" ? await (async () => {
+    const [totalEmployees, activeEmployees, sessions, attendance, bookings, creditNotes, salesByEmployee] = await Promise.all([
+      prisma.employee.count(),
+      prisma.employee.count({ where: { status: "ACTIVE" } }),
+      prisma.loginSession.count({ where: { endedAt: null } }),
+      prisma.attendance.findMany({ where: { date: { gte: today, lt: tomorrow } } }),
+      prisma.advanceBooking.findMany({ where: { date: { gte: today, lt: tomorrow } } }),
+      prisma.creditNote.findMany({ where: { createdAt: { gte: today, lt: tomorrow } } }),
+      prisma.invoice.groupBy({ by: ["employeeCode", "billerName"], where: { date: { gte: today, lt: tomorrow }, status: "FINAL" }, _count: { _all: true }, _sum: { grandTotal: true } }),
+    ]);
+    return { totalEmployees, activeEmployees, online: sessions, attendance, bookings, creditNotes, salesByEmployee };
+  })() : null;
 
   return (
     <div className="space-y-6">
@@ -59,7 +78,7 @@ export default async function DashboardPage() {
           hint={`Net payable: ${inr(stats.today.net)}`}
         />
         <Stat
-          label="Old Gold Exchange"
+          label="Exchange Credit"
           value={inr(stats.today.oldGold)}
           hint="Trade-in value credited"
         />
@@ -69,6 +88,11 @@ export default async function DashboardPage() {
           hint={`${stats.stock.pieces} tagged piece(s) in stock`}
         />
       </div>
+
+      {staff && <section className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-display text-lg font-semibold">Employee &amp; Staff Overview</h2><Link href="/employees" className="text-xs font-semibold text-royal">Manage staff →</Link></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Stat label="Active employees" value={`${staff.activeEmployees} / ${staff.totalEmployees}`} /><Stat label="Currently logged in" value={staff.online} /><Stat label="Present today" value={staff.attendance.filter((row) => row.checkIn).length} /><Stat label="Today's bookings" value={staff.bookings.length} hint={`Advance collected: ${inr(staff.bookings.reduce((sum, row) => sum + Number(row.advancePaid), 0))}`} /><Stat label="Credit notes today" value={staff.creditNotes.length} hint={`Pending approval: ${staff.creditNotes.filter((row) => row.status === "PENDING").length}`} /></div>
+        <Card padded={false}><div className="border-b border-sand px-5 py-3"><h3 className="font-semibold">Sales by employee · Today</h3></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-stone"><th className="p-3">Employee</th><th className="p-3">Code</th><th className="p-3 text-right">Bills</th><th className="p-3 text-right">Sales</th></tr></thead><tbody>{staff.salesByEmployee.map((row) => <tr key={`${row.employeeCode}-${row.billerName}`} className="border-b border-sand/60"><td className="p-3">{row.billerName || "Legacy bills"}</td><td className="p-3 font-mono">{row.employeeCode || "—"}</td><td className="p-3 text-right">{row._count._all}</td><td className="p-3 text-right font-semibold">{inr(Number(row._sum.grandTotal ?? 0))}</td></tr>)}{staff.salesByEmployee.length === 0 && <tr><td className="p-3 text-stone" colSpan={4}>No bills yet today.</td></tr>}</tbody></table></div></Card>
+      </section>}
 
       {/* Main Grid: Recent Bills & Outstanding Balances */}
       <div className="grid gap-6 lg:grid-cols-3">

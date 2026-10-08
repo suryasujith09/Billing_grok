@@ -12,6 +12,9 @@ import {
   ShoppingBag,
   ShieldCheck,
   Users,
+  CalendarCheck,
+  BookmarkPlus,
+  BadgeDollarSign,
   X,
 } from "lucide-react";
 import { cn } from "./ui";
@@ -24,6 +27,10 @@ const ALL_NAV = [
   { href: "/invoices", label: "Invoices", icon: BookOpen, adminOnly: false },
   { href: "/inventory", label: "Stock", icon: Gem, adminOnly: false },
   { href: "/customers", label: "Customers", icon: Users, adminOnly: false },
+  { href: "/attendance", label: "Attendance", icon: CalendarCheck, adminOnly: false },
+  { href: "/bookings", label: "Advance bookings", icon: BookmarkPlus, adminOnly: false },
+  { href: "/credit-notes", label: "Credit notes", icon: BadgeDollarSign, adminOnly: false },
+  { href: "/employees", label: "Employees & Counters", icon: Users, adminOnly: true },
   { href: "/reports", label: "Reports", icon: ShoppingBag, adminOnly: true },
   { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];

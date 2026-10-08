@@ -109,14 +109,19 @@
 .sg-items td { padding: 2.5mm 1.3mm; border-bottom: 1px solid var(--sg-line); vertical-align: top; }
 .sg-items td strong, .sg-items td small { display: block; }
 .sg-items td small { color: var(--sg-muted); font-size: 7pt; }
-.sg-tax-cell { min-width: 25mm; color: var(--sg-green); font-size: 7pt; white-space: nowrap; }
-.sg-tax-cell span { display: block; }
 .sg-items tfoot td { color: var(--sg-green); background: #f6f4ee; font-weight: 700; }
 .sg-items .right, .sg-buyback-table td:last-child { text-align: right; white-space: nowrap; }
 .sg-lower { display: grid; grid-template-columns: 1.05fr .95fr; gap: 8mm; margin-top: 6mm; }
 .sg-payment, .sg-totals { padding: 4mm; border: 1px solid var(--sg-line); border-radius: 2mm; }
 .sg-payment h2 { margin: 0 0 3mm; color: var(--sg-green); font-size: 8pt; letter-spacing: .1em; }
 .sg-payment > p { color: var(--sg-muted); font-size: 8pt; }
+.sg-exchange-wrap { margin-top: 3mm; }
+.sg-exchange-wrap h3 { margin-bottom: 1mm; color: var(--sg-green); font-size: 6.5pt; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.sg-exchange { width: 100%; border-collapse: collapse; font-size: 5.8pt; line-height: 1.15; }
+.sg-exchange th, .sg-exchange td { padding: 1.1mm .7mm; border-bottom: 1px solid var(--sg-line); text-align: right; vertical-align: top; white-space: nowrap; }
+.sg-exchange th { color: var(--sg-muted); font-size: 5.3pt; text-transform: uppercase; }
+.sg-exchange th:first-child, .sg-exchange td:first-child { text-align: left; white-space: normal; }
+.sg-exchange td small { display: block; color: var(--sg-muted); font-size: 5.3pt; }
 .sg-line { display: flex; justify-content: space-between; gap: 4mm; padding: 1.5mm 0; font-size: 8.5pt; }
 .sg-line span { color: var(--sg-muted); }
 .sg-line strong { text-align: right; }
@@ -131,13 +136,13 @@
 .sg-declaration { display: grid; grid-template-columns: 1fr .7fr .7fr; align-items: end; gap: 7mm; margin-top: 7mm; font-size: 7.5pt; }
 .sg-declaration > strong { min-height: 14mm; padding-top: 9mm; border-top: 1px solid #9ba49c; text-align: center; font-size: 7pt; }
 .sg-declaration small { display: block; color: var(--sg-muted); font-weight: 400; }
+.sg-tax-registration { display: flex; flex-wrap: wrap; align-items: center; gap: 1mm 4mm; margin-top: 2mm; padding: 1.5mm 3mm; border-top: 1px solid var(--sg-line); color: var(--sg-muted); font-size: 6.5pt; }
+.sg-tax-registration > span:first-child { color: var(--sg-green); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.sg-tax-registration strong { color: var(--sg-ink); font-weight: 700; }
 .sg-credentials { display: flex; justify-content: space-between; align-items: center; gap: 8mm; margin: 4mm 0 10mm; padding: 2mm 4mm; border-top: 1px solid var(--sg-line); border-bottom: 1px solid var(--sg-line); }
-.sg-bis, .sg-twinkle { display: flex; align-items: center; gap: 3mm; }
+.sg-bis { display: flex; align-items: center; gap: 3mm; }
 .sg-bis img { width: 27mm; height: 15mm; object-fit: contain; }
 .sg-bis span { color: var(--sg-green); font-size: 7pt; font-weight: 800; letter-spacing: .07em; }
-.sg-twinkle { margin-left: auto; }
-.sg-twinkle img { width: 30mm; height: 20mm; object-fit: contain; }
-.sg-twinkle strong { color: var(--sg-gold); font-family: var(--font-display), Georgia, serif; font-size: 9pt; }
 .sg-footer { position: absolute; right: 10mm; bottom: 7mm; left: 10mm; display: flex; justify-content: space-between; gap: 4mm; padding-top: 2mm; border-top: 1px solid var(--sg-line); color: var(--sg-muted); font-size: 7pt; letter-spacing: .06em; }
 .sg-back { padding-top: 8mm; }
 .sg-back-head { display: grid; grid-template-columns: 17mm 1fr 35mm; gap: 4mm; align-items: center; padding-bottom: 4mm; border-bottom: 1px solid var(--sg-line); }
@@ -198,7 +203,6 @@
   .sg-terms-grid { row-gap: 2.4mm !important; }
   .sg-footer { right: 9mm !important; bottom: 5mm !important; left: 9mm !important; }
   .sg-credentials { margin-bottom: 10mm !important; }
-  .sg-twinkle img { width: 27mm !important; height: 18mm !important; }
 }
 
 @theme inline {

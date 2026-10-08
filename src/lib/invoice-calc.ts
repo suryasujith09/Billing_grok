@@ -90,6 +90,20 @@ export function calcOldGold(
   return r2(netWeight * ratePerGram * (1 - deductionPercent / 100));
 }
 
+export function calcExchange(
+  netWeight: number,
+  ratePerUnit: number,
+  dustWeight: number,
+  wastageWeight: number,
+) {
+  const finalNetWeight = Math.max(0, r2(netWeight - dustWeight - wastageWeight));
+  return {
+    finalNetWeight,
+    amount: r2(netWeight * ratePerUnit),
+    finalAmount: r2(finalNetWeight * ratePerUnit),
+  };
+}
+
 export type InvoiceTotals = {
   goldValue: number;
   makingAmount: number;

@@ -3,12 +3,14 @@ import { listInvoices } from "@/lib/queries";
 import { formatDate, inr, num } from "@/lib/money";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
 import { Plus, Receipt, Search } from "lucide-react";
+import { connection } from "next/server";
 
 export default async function InvoicesPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; from?: string; to?: string; page?: string }>;
 }) {
+  await connection();
   const params = await searchParams;
   const q = params.q ?? "";
   const fromDate = params.from ? new Date(params.from) : undefined;
@@ -117,7 +119,7 @@ export default async function InvoicesPage({
                   <th className="px-5 py-3">Customer</th>
                   <th className="px-5 py-3 text-right">Items</th>
                   <th className="px-5 py-3 text-right">Grand Total</th>
-                  <th className="px-5 py-3 text-right">Old Gold</th>
+                  <th className="px-5 py-3 text-right">Exchange Credit</th>
                   <th className="px-5 py-3 text-right">Net Payable</th>
                   <th className="px-5 py-3 text-right">Paid</th>
                   <th className="px-5 py-3 text-center">Status</th>

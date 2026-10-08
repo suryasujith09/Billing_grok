@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session";
 
 // Paths that require admin role
-const ADMIN_ONLY_PATHS = ["/reports", "/settings"];
+const ADMIN_ONLY_PATHS = ["/reports", "/settings", "/employees"];
 
 // Paths that are always public (no session required)
 const PUBLIC_PATHS = ["/login"];
@@ -29,7 +29,10 @@ export async function proxy(request: NextRequest) {
   }
 
   // Counter trying to access admin-only paths → redirect to home
-  if (session.role === "counter" && ADMIN_ONLY_PATHS.some((p) => pathname.startsWith(p))) {
+  const isAdminOnlyPath =
+    ADMIN_ONLY_PATHS.some((p) => pathname.startsWith(p)) ||
+    /^\/invoices\/[^/]+\/edit\/?$/.test(pathname);
+  if (session.role !== "admin" && isAdminOnlyPath) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

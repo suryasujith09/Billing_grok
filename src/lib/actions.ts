@@ -7,12 +7,13 @@ import { prisma } from "./db";
 import {
   calcInvoice,
   calcLine,
-  calcOldGold,
+  calcExchange,
   type MakingGstMode,
   type MakingType,
 } from "./invoice-calc";
 import { financialYear, num, padInvoice, r2 } from "./money";
 import { getLatestRates, getShop } from "./queries";
+import { getSession } from "./session";
 
 import { generateUniqueTagId, isValidTagBarcode } from "./tag-generator";
 
@@ -82,12 +83,17 @@ const lineSchema = z.object({
 
 const exchangeSchema = z.object({
   description: z.string().min(1),
-  metal: z.string().optional().default("GOLD"),
+  metal: z.enum(["GOLD", "SILVER", "PLATINUM", "DIAMOND"]).default("GOLD"),
   purity: z.string().min(1),
+  quantity: z.coerce.number().int().positive().default(1),
   grossWeight: z.coerce.number().nonnegative(),
   netWeight: z.coerce.number().positive(),
+  dustWeight: z.coerce.number().nonnegative().default(0),
+  wastageWeight: z.coerce.number().nonnegative().default(0),
   ratePerGram: z.coerce.number().positive(),
   deductionPercent: z.coerce.number().nonnegative().optional().default(0),
+}).refine((value) => value.dustWeight + value.wastageWeight <= value.netWeight, {
+  message: "Dust and wastage weight cannot exceed net weight.",
 });
 
 const paymentSchema = z.object({
@@ -407,6 +413,13 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid bill" };
   }
   const input = parsed.data;
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sign in before creating an invoice." };
+  if (!session.employeeId) return { ok: false, error: "Use your individual employee login to create a bill." };
+  const employee = session.employeeId ? await prisma.employee.findUnique({ where: { id: session.employeeId }, include: { counter: true } }) : null;
+  if (session.employeeId && (!employee || employee.status !== "ACTIVE")) {
+    return { ok: false, error: "Your employee account is inactive. Ask an administrator to restore access." };
+  }
   const shop = await getShop();
   const mode = shop.makingGstMode as MakingGstMode;
 
@@ -427,10 +440,14 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
     return { item, calc };
   });
 
-  const exchanges = input.exchanges.map((ex) => ({
-    ...ex,
-    amount: calcOldGold(ex.netWeight, ex.ratePerGram, ex.deductionPercent),
-  }));
+  const exchanges = input.exchanges.map((ex) => {
+    const values = calcExchange(ex.netWeight, ex.ratePerGram, ex.dustWeight, ex.wastageWeight);
+    return {
+      ...ex,
+      deductionPercent: ex.netWeight > 0 ? ((ex.dustWeight + ex.wastageWeight) / ex.netWeight) * 100 : 0,
+      amount: values.finalAmount,
+    };
+  });
   const oldGoldValue = r2(exchanges.reduce((s, ex) => s + ex.amount, 0));
   const paidAmount = r2(input.payments.reduce((s, p) => s + p.amount, 0));
   const totals = calcInvoice(
@@ -469,6 +486,13 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
           customerGstin: input.customerGstin,
           placeOfSupply: input.placeOfSupply || current.state,
           notes: input.notes,
+          employee: employee ? { connect: { id: employee.id } } : undefined,
+          employeeCode: employee?.employeeCode ?? session.employeeCode ?? (session.role === "admin" ? "ADMIN" : "COUNTER"),
+          billerName: employee?.name ?? session.username,
+          billerSignature: employee?.signature ?? "",
+          counter: employee?.counter ? { connect: { id: employee.counter.id } } : undefined,
+          counterNumber: employee?.counter?.number ?? "",
+          counterName: employee?.counter?.name ?? "",
           ...dbTotals,
           items: {
             create: computedItems.map(({ item, calc }) => ({
@@ -522,6 +546,11 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
         data: { nextInvoiceNo: current.nextInvoiceNo + 1 },
       });
 
+      if (employee) await tx.employeeActivity.create({ data: {
+        employeeId: employee.id, employeeCode: employee.employeeCode, employeeName: employee.name,
+        action: "BILL_CREATED", transactionNo: invoiceNo,
+      } });
+
       return created;
     });
 
@@ -536,6 +565,8 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
 }
 
 export async function cancelInvoiceAction(id: string): Promise<ActionState> {
+  const session = await getSession();
+  if (!session || session.role === "counter") return { ok: false, error: "Manager or administrator access is required to cancel invoices." };
   try {
     await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
@@ -549,6 +580,10 @@ export async function cancelInvoiceAction(id: string): Promise<ActionState> {
         where: { id },
         data: { status: "CANCELLED" },
       });
+      if (session.employeeId) await tx.employeeActivity.create({ data: {
+        employeeId: session.employeeId, employeeCode: session.employeeCode ?? "", employeeName: session.employeeName ?? session.username,
+        action: "BILL_CANCELLED", transactionNo: invoice.invoiceNo, oldValue: invoice.status, newValue: "CANCELLED",
+      } });
 
       const ids = invoice.items
         .map((item) => item.ornamentId)
@@ -569,12 +604,143 @@ export async function cancelInvoiceAction(id: string): Promise<ActionState> {
   }
 }
 
+export async function updateInvoiceAction(id: string, raw: unknown): Promise<ActionState> {
+  const session = await getSession();
+  if (session?.role !== "admin") {
+    return { ok: false, error: "Only administrators can edit invoices." };
+  }
+
+  const parsed = invoiceSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid invoice details" };
+  }
+  const input = parsed.data;
+
+  try {
+    const shop = await getShop();
+    const mode = shop.makingGstMode as MakingGstMode;
+    const current = await prisma.invoice.findUnique({
+      where: { id },
+      include: { payments: true },
+    });
+    if (!current) throw new Error("Invoice not found");
+    if (current.status !== "FINAL") throw new Error("Cancelled invoices cannot be edited.");
+
+    const computedItems = input.items.map((item) => ({
+      item,
+      calc: calcLine({
+        netWeight: item.netWeight,
+        ratePerGram: item.ratePerGram,
+        makingType: item.makingType,
+        makingValue: item.makingValue,
+        wastagePercent: item.wastagePercent,
+        stoneCharge: item.stoneCharge,
+        hallmarkCharge: item.hallmarkCharge,
+        otherCharge: item.otherCharge,
+      }, mode),
+    }));
+    const exchanges = input.exchanges.map((exchange) => {
+      const values = calcExchange(exchange.netWeight, exchange.ratePerGram, exchange.dustWeight, exchange.wastageWeight);
+      return {
+        ...exchange,
+        deductionPercent: exchange.netWeight > 0
+          ? ((exchange.dustWeight + exchange.wastageWeight) / exchange.netWeight) * 100
+          : 0,
+        amount: values.finalAmount,
+      };
+    });
+    const oldGoldValue = r2(exchanges.reduce((sum, exchange) => sum + exchange.amount, 0));
+    const paidAmount = r2(current.payments.reduce((sum, payment) => sum + num(payment.amount), 0));
+    const totals = calcInvoice(
+      computedItems.map(({ item, calc }) => ({
+        ...calc,
+        stoneCharge: item.stoneCharge,
+        hallmarkCharge: item.hallmarkCharge,
+        otherCharge: item.otherCharge,
+      })),
+      oldGoldValue,
+      paidAmount,
+    );
+    if (paidAmount > totals.netPayable) {
+      return { ok: false, error: "The edited net payable cannot be less than payments already collected." };
+    }
+    const { gstTotal: _gstTotal, beforeRound: _beforeRound, ...dbTotals } = totals;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          customer: input.customerId ? { connect: { id: input.customerId } } : { disconnect: true },
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          customerAddr: input.customerAddr,
+          customerPan: input.customerPan,
+          customerGstin: input.customerGstin,
+          placeOfSupply: input.placeOfSupply || shop.state,
+          notes: input.notes,
+          ...dbTotals,
+          items: {
+            deleteMany: {},
+            create: computedItems.map(({ item, calc }) => ({
+              ornament: item.ornamentId ? { connect: { id: item.ornamentId } } : undefined,
+              tagNo: item.tagNo,
+              description: item.description,
+              hsn: item.hsn,
+              huid: item.huid,
+              metal: item.metal,
+              purity: item.purity,
+              category: item.category,
+              grossWeight: item.grossWeight,
+              stoneWeight: item.stoneWeight,
+              netWeight: item.netWeight,
+              ratePerGram: item.ratePerGram,
+              goldValue: calc.goldValue,
+              makingType: item.makingType,
+              makingValue: item.makingValue,
+              makingAmount: calc.makingAmount,
+              wastagePercent: item.wastagePercent,
+              wastageAmount: calc.wastageAmount,
+              stoneCharge: item.stoneCharge,
+              hallmarkCharge: item.hallmarkCharge,
+              otherCharge: item.otherCharge,
+              taxable3: calc.taxable3,
+              taxable5: calc.taxable5,
+              lineTotal: calc.lineTotal,
+            })),
+          },
+          exchanges: {
+            deleteMany: {},
+            create: exchanges,
+          },
+          paidAmount,
+          balanceAmount: r2(totals.netPayable - paidAmount),
+        },
+      });
+      if (session.employeeId) await tx.employeeActivity.create({ data: {
+        employeeId: session.employeeId, employeeCode: session.employeeCode ?? "", employeeName: session.employeeName ?? session.username,
+        action: "BILL_MODIFIED", transactionNo: current.invoiceNo,
+      } });
+    });
+
+    revalidatePath("/");
+    revalidatePath("/invoices");
+    revalidatePath(`/invoices/${id}`);
+    revalidatePath(`/invoices/${id}/edit`);
+    revalidatePath("/reports");
+    return { ok: true, id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not update invoice" };
+  }
+}
+
 export async function addPaymentAction(
   invoiceId: string,
   method: string,
   amount: number,
   reference: string,
 ): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sign in before recording a payment." };
   try {
     await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
@@ -595,6 +761,10 @@ export async function addPaymentAction(
           balanceAmount: r2(num(invoice.netPayable) - paid),
         },
       });
+      if (session.employeeId) await tx.employeeActivity.create({ data: {
+        employeeId: session.employeeId, employeeCode: session.employeeCode ?? "", employeeName: session.employeeName ?? session.username,
+        action: "PAYMENT_COLLECTED", transactionNo: invoice.invoiceNo, newValue: `${amount} ${method}`,
+      } });
     });
     revalidatePath(`/invoices/${invoiceId}`);
     revalidatePath("/reports");

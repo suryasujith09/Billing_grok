@@ -71,7 +71,7 @@ export default function LoginPage() {
                   autoComplete="username"
                   autoFocus
                   required
-                  placeholder="admin / counter"
+                  placeholder="Employee username"
                   className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/8 border border-white/12 text-cream placeholder:text-cream/25 text-sm focus:outline-none focus:border-gold/50 focus:bg-white/10 transition"
                 />
               </div>

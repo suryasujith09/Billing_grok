@@ -4,12 +4,15 @@ import { formatDate, grams, inr, num, todayISO } from "@/lib/money";
 import { labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Stat } from "@/components/ui";
 import { Calendar, Filter, PieChart, ShoppingBag } from "lucide-react";
+import { prisma } from "@/lib/db";
+import { connection } from "next/server";
 
 export default async function ReportsPage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await connection();
   const params = await searchParams;
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -18,6 +21,11 @@ export default async function ReportsPage({
   const to = params.to ? new Date(params.to) : now;
 
   const report = await reportForRange(from, to);
+  const invoiceWhere = { status: "FINAL", date: { gte: from, lte: to } };
+  const [staffSales, counterSales] = await Promise.all([
+    prisma.invoice.groupBy({ by: ["employeeCode", "billerName"], where: invoiceWhere, _count: { _all: true }, _sum: { grandTotal: true, oldGoldValue: true } }),
+    prisma.invoice.groupBy({ by: ["counterNumber"], where: invoiceWhere, _count: { _all: true }, _sum: { grandTotal: true } }),
+  ]);
   const { totals, paymentBreak, categoryBreak, stock } = report;
 
   return (
@@ -57,6 +65,11 @@ export default async function ReportsPage({
         </form>
       </Card>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card padded={false}><div className="border-b border-sand px-5 py-4"><h2 className="font-display text-lg font-semibold">Sales by employee</h2></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-stone"><th className="p-3">Employee</th><th className="p-3">Code</th><th className="p-3 text-right">Bills</th><th className="p-3 text-right">Sales</th></tr></thead><tbody>{staffSales.map((row) => <tr key={`${row.employeeCode}-${row.billerName}`} className="border-b border-sand/60"><td className="p-3">{row.billerName || "Legacy bills"}</td><td className="p-3 font-mono">{row.employeeCode || "—"}</td><td className="p-3 text-right">{row._count._all}</td><td className="p-3 text-right font-semibold">{inr(num(row._sum.grandTotal))}</td></tr>)}</tbody></table></div></Card>
+        <Card padded={false}><div className="border-b border-sand px-5 py-4"><h2 className="font-display text-lg font-semibold">Sales by counter</h2></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-stone"><th className="p-3">Counter</th><th className="p-3 text-right">Bills</th><th className="p-3 text-right">Sales</th></tr></thead><tbody>{counterSales.map((row) => <tr key={row.counterNumber || "unassigned"} className="border-b border-sand/60"><td className="p-3">{row.counterNumber || "Unassigned"}</td><td className="p-3 text-right">{row._count._all}</td><td className="p-3 text-right font-semibold">{inr(num(row._sum.grandTotal))}</td></tr>)}</tbody></table></div></Card>
+      </div>
+
       {/* Executive Summary Stats */}
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
@@ -70,7 +83,7 @@ export default async function ReportsPage({
           hint={`Includes Gold: ${inr(totals.goldValue)} + Making: ${inr(totals.making)}`}
         />
         <Stat
-          label="Old Gold Credit"
+          label="Exchange Credit"
           value={inr(totals.oldGold)}
           hint="Trade-in value deducted"
         />
@@ -213,7 +226,7 @@ export default async function ReportsPage({
                   <th className="px-5 py-3 text-right">Items</th>
                   <th className="px-5 py-3 text-right">Grand Total</th>
                   <th className="px-5 py-3 text-right">GST</th>
-                  <th className="px-5 py-3 text-right">Old Gold</th>
+                  <th className="px-5 py-3 text-right">Exchange Credit</th>
                   <th className="px-5 py-3 text-right">Net Payable</th>
                   <th className="px-5 py-3 text-right">Paid</th>
                   <th className="px-5 py-3 text-right">Action</th>

@@ -13,8 +13,8 @@ import {
 } from "@/lib/constants";
 import {
   calcInvoice,
+  calcExchange,
   calcLine,
-  calcOldGold,
   type MakingGstMode,
   type MakingType,
 } from "@/lib/invoice-calc";
@@ -53,8 +53,11 @@ type Exchange = {
   description: string;
   metal: string;
   purity: string;
+  quantity: number;
   grossWeight: number;
   netWeight: number;
+  dustWeight: number;
+  wastageWeight: number;
   ratePerGram: number;
   deductionPercent: number;
 };
@@ -106,8 +109,11 @@ function emptyExchange(rates: RateRow[]): Exchange {
     description: "Old gold",
     metal: "GOLD",
     purity: "22K",
+    quantity: 1,
     grossWeight: 0,
     netWeight: 0,
+    dustWeight: 0,
+    wastageWeight: 0,
     ratePerGram: rate22,
     deductionPercent: 0,
   };
@@ -119,12 +125,14 @@ export function BillingDesk({
   stockCount,
   makingGstMode,
   placeOfSupply,
+  biller,
 }: {
   rates: RateRow[];
   stockItems: StockItem[];
   stockCount: number;
   makingGstMode: MakingGstMode;
   placeOfSupply: string;
+  biller: { name: string; code: string; counter: string };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -157,9 +165,9 @@ export function BillingDesk({
     }));
     const olds = exchanges.map((ex) => ({
       ...ex,
-      amount: calcOldGold(ex.netWeight, ex.ratePerGram, ex.deductionPercent),
+      ...calcExchange(ex.netWeight, ex.ratePerGram, ex.dustWeight, ex.wastageWeight),
     }));
-    const oldGoldValue = r2(olds.reduce((s, ex) => s + ex.amount, 0));
+    const oldGoldValue = r2(olds.reduce((s, ex) => s + ex.finalAmount, 0));
     const paidAmount = r2(payments.reduce((s, p) => s + Number(p.amount || 0), 0));
     const totals = calcInvoice(
       lines.map(({ item, calc }) => ({
@@ -190,6 +198,12 @@ export function BillingDesk({
         return next;
       }),
     );
+  }
+
+  function patchExchange(key: string, patch: Partial<Exchange>) {
+    setExchanges((current) => current.map((exchange) =>
+      exchange.key === key ? { ...exchange, ...patch } : exchange,
+    ));
   }
 
   async function addByTag(event?: React.FormEvent) {
@@ -349,6 +363,11 @@ export function BillingDesk({
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
+        <Card className="border-gold/30 bg-gold/5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-stone">Logged-in biller</p>
+          <p className="font-semibold text-ink">{biller.name} <span className="font-mono text-xs text-stone">{biller.code}</span></p>
+          {biller.counter && <p className="text-xs text-stone">Counter {biller.counter}</p>}
+        </Card>
         <Card>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-xl">Customer</h2>
@@ -656,11 +675,11 @@ export function BillingDesk({
         <Card>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="font-display text-xl">Old gold exchange</h2>
-              <p className="text-xs text-stone">Valued as a purchase and deducted from the bill.</p>
+              <h2 className="font-display text-xl">Old metal &amp; diamond exchange</h2>
+              <p className="text-xs text-stone">Gold and silver are weighed in grams; diamonds are weighed in carats.</p>
             </div>
             <Button type="button" variant="ghost" size="sm" onClick={() => setExchanges((c) => [...c, emptyExchange(rates)])}>
-              <Plus size={14} /> Add old gold
+              <Plus size={14} /> Add exchange
             </Button>
           </div>
           {exchanges.length === 0 ? (
@@ -668,80 +687,41 @@ export function BillingDesk({
           ) : (
             <div className="space-y-3">
               {computed.olds.map((ex) => (
-                <div key={ex.key} className="grid gap-3 rounded-md border border-sand bg-white p-3 md:grid-cols-7">
-                  <Field label="Particulars" className="md:col-span-2">
-                    <Input
-                      value={ex.description}
-                      onChange={(e) =>
-                        setExchanges((c) =>
-                          c.map((row) => (row.key === ex.key ? { ...row, description: e.target.value } : row)),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Purity">
-                    <Select
-                      value={ex.purity}
-                      onChange={(e) =>
-                        setExchanges((c) =>
-                          c.map((row) => (row.key === ex.key ? { ...row, purity: e.target.value } : row)),
-                        )
-                      }
-                    >
-                      {(PURITIES[ex.metal] ?? ["22K"]).map((p) => (
-                        <option key={p}>{p}</option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field label="Net g">
-                    <Input
-                      type="number"
-                      step="0.001"
-                      value={ex.netWeight || ""}
-                      onChange={(e) =>
-                        setExchanges((c) =>
-                          c.map((row) =>
-                            row.key === ex.key
-                              ? { ...row, netWeight: Number(e.target.value), grossWeight: Number(e.target.value) }
-                              : row,
-                          ),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Rate / g">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={ex.ratePerGram || ""}
-                      onChange={(e) =>
-                        setExchanges((c) =>
-                          c.map((row) => (row.key === ex.key ? { ...row, ratePerGram: Number(e.target.value) } : row)),
-                        )
-                      }
-                    />
-                  </Field>
-                  <Field label="Deduct %">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={ex.deductionPercent || ""}
-                      onChange={(e) =>
-                        setExchanges((c) =>
-                          c.map((row) =>
-                            row.key === ex.key ? { ...row, deductionPercent: Number(e.target.value) } : row,
-                          ),
-                        )
-                      }
-                    />
-                  </Field>
-                  <div className="flex items-end justify-between gap-2">
-                    <p className="text-sm font-semibold tabular">{inr(ex.amount)}</p>
-                    <button
-                      type="button"
-                      className="text-danger"
-                      onClick={() => setExchanges((c) => c.filter((row) => row.key !== ex.key))}
-                    >
+                <div key={ex.key} className="rounded-md border border-sand bg-white p-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Metal / stone">
+                      <Select value={ex.metal} onChange={(event) => {
+                        const metal = event.target.value;
+                        const purity = metal === "DIAMOND" ? "N/A" : metal === "SILVER" ? "925" : "22K";
+                        const rate = rates.find((row) => row.metal === metal && row.purity === purity)?.ratePerGram ?? 0;
+                        const description = /^old (gold|silver|diamond|platinum)$/i.test(ex.description)
+                          ? `Old ${metal.toLowerCase()}`
+                          : ex.description;
+                        patchExchange(ex.key, { metal, purity, ratePerGram: rate, description });
+                      }}>
+                        <option value="GOLD">Gold</option><option value="SILVER">Silver</option><option value="DIAMOND">Diamond</option><option value="PLATINUM">Platinum</option>
+                      </Select>
+                    </Field>
+                    <Field label={ex.metal === "DIAMOND" ? "Type" : "Purity"}>
+                      {ex.metal === "DIAMOND" ? <Input value={ex.purity} onChange={(event) => patchExchange(ex.key, { purity: event.target.value })} /> : (
+                        <Select value={ex.purity} onChange={(event) => patchExchange(ex.key, { purity: event.target.value })}>
+                          {(PURITIES[ex.metal] ?? ["N/A"]).map((purity) => <option key={purity}>{purity}</option>)}
+                        </Select>
+                      )}
+                    </Field>
+                    <Field label="Particulars"><Input value={ex.description} onChange={(event) => patchExchange(ex.key, { description: event.target.value })} /></Field>
+                    <Field label="Quantity"><Input type="number" min="1" step="1" value={ex.quantity} onChange={(event) => patchExchange(ex.key, { quantity: Number(event.target.value) })} /></Field>
+                    <Field label={`Gross wt (${ex.metal === "DIAMOND" ? "ct" : "g"})`}><Input type="number" min="0" step="0.001" value={ex.grossWeight || ""} onChange={(event) => patchExchange(ex.key, { grossWeight: Number(event.target.value) })} /></Field>
+                    <Field label={`Net wt (${ex.metal === "DIAMOND" ? "ct" : "g"})`}><Input type="number" min="0.001" step="0.001" value={ex.netWeight || ""} onChange={(event) => patchExchange(ex.key, { netWeight: Number(event.target.value) })} /></Field>
+                    <Field label={`Rate / ${ex.metal === "DIAMOND" ? "ct" : "g"}`}><Input type="number" min="0.01" step="0.01" value={ex.ratePerGram || ""} onChange={(event) => patchExchange(ex.key, { ratePerGram: Number(event.target.value) })} /></Field>
+                    <Field label="Dust wt"><Input type="number" min="0" max={ex.netWeight} step="0.001" value={ex.dustWeight || ""} onChange={(event) => patchExchange(ex.key, { dustWeight: Number(event.target.value) })} /></Field>
+                    <Field label="Wastage wt"><Input type="number" min="0" max={Math.max(0, ex.netWeight - ex.dustWeight)} step="0.001" value={ex.wastageWeight || ""} onChange={(event) => patchExchange(ex.key, { wastageWeight: Number(event.target.value) })} /></Field>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-sand pt-3 text-xs">
+                    <span>Amount <strong>{inr(ex.amount)}</strong></span>
+                    <span>Final net wt <strong>{ex.finalNetWeight.toFixed(3)} {ex.metal === "DIAMOND" ? "ct" : "g"}</strong></span>
+                    <span className="text-ink">Final amount <strong>{inr(ex.finalAmount)}</strong></span>
+                    <button type="button" className="ml-auto text-danger" aria-label="Remove exchange" onClick={() => setExchanges((current) => current.filter((row) => row.key !== ex.key))}>
                       <Trash2 size={16} />
                     </button>
                   </div>
@@ -772,7 +752,7 @@ export function BillingDesk({
             ) : null}
             <Row label="Round off" value={inr(computed.totals.roundOff)} />
             <Row label="Invoice value" value={inr(computed.totals.grandTotal)} strong />
-            <Row label="Less old gold" value={inr(computed.totals.oldGoldValue)} />
+            <Row label="Less exchange credit" value={inr(computed.totals.oldGoldValue)} />
             <Row label="Net payable" value={inr(computed.totals.netPayable)} strong />
             <Row label="Received" value={inr(computed.totals.paidAmount)} />
             <Row

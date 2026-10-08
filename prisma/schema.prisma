@@ -8,26 +8,26 @@ datasource db {
 }
 
 model Shop {
-  id            String  @id @default("default")
+  id            String @id @default("default")
   name          String
-  logoUrl       String  @default("")
-  legalName     String  @default("")
-  address       String  @default("")
-  city          String  @default("")
-  state         String  @default("")
-  stateCode     String  @default("")
-  pincode       String  @default("")
-  phone         String  @default("")
-  email         String  @default("")
-  gstin         String  @default("")
-  pan           String  @default("")
-  bankName      String  @default("")
-  bankAccount   String  @default("")
-  ifsc          String  @default("")
-  invoicePrefix String  @default("SGD")
-  nextInvoiceNo Int     @default(1)
-  makingGstMode String  @default("SEPARATE_5")
-  terms         String  @default("")
+  logoUrl       String @default("")
+  legalName     String @default("")
+  address       String @default("")
+  city          String @default("")
+  state         String @default("")
+  stateCode     String @default("")
+  pincode       String @default("")
+  phone         String @default("")
+  email         String @default("")
+  gstin         String @default("")
+  pan           String @default("")
+  bankName      String @default("")
+  bankAccount   String @default("")
+  ifsc          String @default("")
+  invoicePrefix String @default("SGD")
+  nextInvoiceNo Int    @default(1)
+  makingGstMode String @default("SEPARATE_5")
+  terms         String @default("")
 }
 
 model MetalRate {
@@ -39,19 +39,20 @@ model MetalRate {
 }
 
 model Customer {
-  id        String    @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
   phone     String
-  altPhone  String    @default("")
-  address   String    @default("")
-  city      String    @default("")
-  state     String    @default("")
-  pincode   String    @default("")
-  pan       String    @default("")
-  gstin     String    @default("")
-  notes     String    @default("")
-  createdAt DateTime  @default(now())
+  altPhone  String           @default("")
+  address   String           @default("")
+  city      String           @default("")
+  state     String           @default("")
+  pincode   String           @default("")
+  pan       String           @default("")
+  gstin     String           @default("")
+  notes     String           @default("")
+  createdAt DateTime         @default(now())
   invoices  Invoice[]
+  bookings  AdvanceBooking[]
 }
 
 model Ornament {
@@ -94,43 +95,240 @@ model Ornament {
 }
 
 model Invoice {
-  id             String        @id @default(cuid())
-  invoiceNo      String        @unique
-  date           DateTime      @default(now())
-  customerId     String?
-  customer       Customer?     @relation(fields: [customerId], references: [id])
-  customerName   String
-  customerPhone  String        @default("")
-  customerAddr   String        @default("")
-  customerPan    String        @default("")
-  customerGstin  String        @default("")
-  placeOfSupply  String        @default("")
-  notes          String        @default("")
-  goldValue      Decimal       @default(0)
-  makingAmount   Decimal       @default(0)
-  wastageAmount  Decimal       @default(0)
-  stoneAmount    Decimal       @default(0)
-  hallmarkAmount Decimal       @default(0)
-  otherAmount    Decimal       @default(0)
-  taxable3       Decimal       @default(0)
-  taxable5       Decimal       @default(0)
-  cgst3          Decimal       @default(0)
-  sgst3          Decimal       @default(0)
-  cgst5          Decimal       @default(0)
-  sgst5          Decimal       @default(0)
-  roundOff       Decimal       @default(0)
-  grandTotal     Decimal       @default(0)
-  oldGoldValue   Decimal       @default(0)
-  netPayable     Decimal       @default(0)
-  paidAmount     Decimal       @default(0)
-  balanceAmount  Decimal       @default(0)
-  status         String        @default("FINAL")
-  createdAt      DateTime      @default(now())
-  items          InvoiceItem[]
-  exchanges      OldGoldItem[]
-  payments       Payment[]
+  id                String                 @id @default(cuid())
+  invoiceNo         String                 @unique
+  date              DateTime               @default(now())
+  customerId        String?
+  customer          Customer?              @relation(fields: [customerId], references: [id])
+  customerName      String
+  customerPhone     String                 @default("")
+  customerAddr      String                 @default("")
+  customerPan       String                 @default("")
+  customerGstin     String                 @default("")
+  placeOfSupply     String                 @default("")
+  notes             String                 @default("")
+  goldValue         Decimal                @default(0)
+  makingAmount      Decimal                @default(0)
+  wastageAmount     Decimal                @default(0)
+  stoneAmount       Decimal                @default(0)
+  hallmarkAmount    Decimal                @default(0)
+  otherAmount       Decimal                @default(0)
+  taxable3          Decimal                @default(0)
+  taxable5          Decimal                @default(0)
+  cgst3             Decimal                @default(0)
+  sgst3             Decimal                @default(0)
+  cgst5             Decimal                @default(0)
+  sgst5             Decimal                @default(0)
+  roundOff          Decimal                @default(0)
+  grandTotal        Decimal                @default(0)
+  oldGoldValue      Decimal                @default(0)
+  netPayable        Decimal                @default(0)
+  paidAmount        Decimal                @default(0)
+  balanceAmount     Decimal                @default(0)
+  status            String                 @default("FINAL")
+  employeeId        String?
+  employeeCode      String                 @default("")
+  billerName        String                 @default("")
+  billerSignature   String                 @default("")
+  counterId         String?
+  counterNumber     String                 @default("")
+  counterName       String                 @default("")
+  employee          Employee?              @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  counter           Counter?               @relation(fields: [counterId], references: [id], onDelete: SetNull)
+  createdAt         DateTime               @default(now())
+  items             InvoiceItem[]
+  exchanges         OldGoldItem[]
+  payments          Payment[]
+  creditNotes       CreditNote[]
+  creditAdjustments CreditNoteAdjustment[]
 
   @@index([customerId])
+  @@index([employeeId, date])
+  @@index([counterId, date])
+}
+
+model Employee {
+  id            String             @id @default(cuid())
+  employeeCode  String             @unique
+  name          String
+  mobile        String             @default("")
+  email         String             @default("")
+  designation   String             @default("")
+  department    String             @default("")
+  dateOfJoining DateTime           @default(now())
+  status        String             @default("ACTIVE")
+  username      String             @unique
+  passwordHash  String
+  role          String             @default("counter")
+  signature     String             @default("")
+  permissions   String             @default("[]")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  counter       Counter?           @relation("AssignedEmployee")
+  invoices      Invoice[]
+  attendance    Attendance[]
+  sessions      LoginSession[]
+  activities    EmployeeActivity[]
+  bookings      AdvanceBooking[]
+  creditNotes   CreditNote[]       @relation("CreditCreatedBy")
+  approvedNotes CreditNote[]       @relation("CreditApprovedBy")
+}
+
+model Counter {
+  id         String           @id @default(cuid())
+  number     String           @unique
+  name       String
+  location   String           @default("")
+  status     String           @default("ACTIVE")
+  employeeId String?          @unique
+  employee   Employee?        @relation("AssignedEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
+  invoices   Invoice[]
+  bookings   AdvanceBooking[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model Attendance {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  employeeCode    String
+  employeeName    String
+  date            DateTime
+  checkIn         DateTime?
+  checkOut        DateTime?
+  status          String    @default("PRESENT")
+  totalMinutes    Int       @default(0)
+  modifiedBy      String    @default("")
+  modificationLog String    @default("[]")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([date, status])
+}
+
+model LoginSession {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  employeeCode String
+  employeeName String
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  userAgent    String    @default("")
+  ipAddress    String    @default("")
+
+  @@index([employeeId, startedAt])
+}
+
+model EmployeeActivity {
+  id            String    @id @default(cuid())
+  employeeId    String?
+  employee      Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employeeCode  String    @default("")
+  employeeName  String    @default("")
+  action        String
+  transactionNo String    @default("")
+  oldValue      String    @default("")
+  newValue      String    @default("")
+  createdAt     DateTime  @default(now())
+
+  @@index([employeeId, createdAt])
+  @@index([action, createdAt])
+}
+
+model AdvanceBooking {
+  id                String           @id @default(cuid())
+  bookingNo         String           @unique
+  date              DateTime         @default(now())
+  customerId        String?
+  customer          Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName      String
+  customerPhone     String           @default("")
+  description       String
+  productCode       String           @default("")
+  category          String           @default("")
+  approximateWeight Decimal          @default(0)
+  purity            String           @default("")
+  metal             String           @default("GOLD")
+  bookingAmount     Decimal          @default(0)
+  advancePaid       Decimal          @default(0)
+  balanceAmount     Decimal          @default(0)
+  paymentMode       String           @default("CASH")
+  expectedDelivery  DateTime?
+  goldRate          Decimal          @default(0)
+  makingCharges     Decimal          @default(0)
+  taxAmount         Decimal          @default(0)
+  instructions      String           @default("")
+  status            String           @default("CONFIRMED")
+  employeeId        String?
+  employeeCode      String           @default("")
+  billerName        String           @default("")
+  billerSignature   String           @default("")
+  counterId         String?
+  counterNumber     String           @default("")
+  payments          AdvancePayment[]
+  employee          Employee?        @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  counter           Counter?         @relation(fields: [counterId], references: [id], onDelete: SetNull)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([date, status])
+  @@index([customerId])
+}
+
+model AdvancePayment {
+  id        String         @id @default(cuid())
+  bookingId String
+  booking   AdvanceBooking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  amount    Decimal
+  mode      String
+  reference String         @default("")
+  createdAt DateTime       @default(now())
+}
+
+model CreditNote {
+  id               String                 @id @default(cuid())
+  creditNoteNo     String                 @unique
+  invoiceId        String
+  invoice          Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceNo        String
+  customerName     String
+  originalBillDate DateTime
+  originalAmount   Decimal
+  creditAmount     Decimal
+  remainingBalance Decimal
+  reason           String
+  status           String                 @default("PENDING")
+  employeeId       String?
+  employeeCode     String                 @default("")
+  createdByName    String                 @default("")
+  approvedById     String?
+  approvedByCode   String                 @default("")
+  approvedByName   String                 @default("")
+  approvedAt       DateTime?
+  adjustments      CreditNoteAdjustment[]
+  creator          Employee?              @relation("CreditCreatedBy", fields: [employeeId], references: [id], onDelete: SetNull)
+  approver         Employee?              @relation("CreditApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime               @default(now())
+
+  @@index([status, createdAt])
+  @@index([invoiceId])
+}
+
+model CreditNoteAdjustment {
+  id           String     @id @default(cuid())
+  creditNoteId String
+  creditNote   CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Restrict)
+  invoiceId    String
+  invoice      Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  invoiceNo    String
+  amount       Decimal
+  employeeCode String     @default("")
+  createdAt    DateTime   @default(now())
+
+  @@index([invoiceId])
 }
 
 model InvoiceItem {
@@ -174,8 +372,11 @@ model OldGoldItem {
   description      String
   metal            String  @default("GOLD")
   purity           String
+  quantity         Int     @default(1)
   grossWeight      Decimal
   netWeight        Decimal
+  dustWeight       Decimal @default(0)
+  wastageWeight    Decimal @default(0)
   ratePerGram      Decimal
   deductionPercent Decimal @default(0)
   amount           Decimal

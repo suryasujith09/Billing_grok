@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 export function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -128,8 +128,10 @@ export function Field({
 const control =
   "w-full rounded-md border border-line bg-white px-3 py-2.5 md:py-2 text-base md:text-sm text-ink outline-none transition placeholder:text-stone/70 focus:border-gold focus:ring-2 focus:ring-gold/25";
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(control, props.className)} {...props} />;
+export function Input({ inputRef, ...props }: InputHTMLAttributes<HTMLInputElement> & {
+  inputRef?: Ref<HTMLInputElement>;
+}) {
+  return <input ref={inputRef} className={cn(control, props.className)} {...props} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {

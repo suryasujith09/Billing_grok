@@ -45,7 +45,7 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Settings, Printer & Label Designer"
-        subtitle="Manage shop profile, daily rates, TVS Electronics LP 46 Dlite thermal printer, and barcode tag templates."
+        subtitle="Manage shop profile, daily rates, TVS Electronics LP 46 Dlite printer, Montex Gold 81×12 mm jewellery tags, and barcode templates."
       />
 
       <SettingsTabs

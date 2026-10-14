@@ -1,7 +1,7 @@
-# TVS Electronics LP 46 Dlite — Jewellery Barcode Tagging & Print Setup Guide
+# TVS Electronics LP 46 Dlite + BS-L100 Plus — Jewellery Barcode Setup
 
 ## Overview
-This document details the configuration, local Windows print agent installation, TSPL printer command setup, and hardware verification procedure for the **TVS Electronics LP 46 Dlite** (203 DPI) thermal label printer integrated into **Surya Gold & Diamonds Billing ERP**.
+This document covers the **TVS Electronics LP 46 Dlite** (203 DPI) label printer, **TVS BS-L100 Plus** USB barcode scanner, and the Montex Gold **81 × 12 mm, 1-up** jewellery tags (SKU `LBC8910261125/3`) used by Surya Gold & Diamonds Billing ERP.
 
 ---
 
@@ -12,7 +12,10 @@ This document details the configuration, local Windows print agent installation,
 - **Command Set**: TSPL / TSPL-EZ
 - **Supported Connection**: USB connected to Windows 11
 - **Max Printable Width**: 108 mm
-- **Standard Jewellery Tag Size**: 60 × 25 mm (Butterfly / Dumbbell Tag with 3 mm media gap)
+- **Jewellery Tag Size**: 81 × 12 mm, one tag across, 1-inch core
+- **ERP barcode**: Code 128; printed inside the tag's 55 mm printable section
+- **Default media gap**: 3 mm; calibrate the loaded roll and adjust this value if the printer feeds off the tag
+- **Scanner connection**: USB HID keyboard mode; scan input ends with Enter
 
 ---
 
@@ -50,19 +53,19 @@ Follow this 13-step checklist before beginning production label printing:
 1. **Install Driver**: Install official TVS LP 46 Dlite Windows driver.
 2. **Connect Hardware**: Plug TVS LP 46 Dlite into USB port on Windows 11 PC and power ON.
 3. **Windows Test Print**: Open Windows Settings -> Printers & Scanners -> TVS LP 46 Dlite -> **Print Test Page**. Confirm page prints.
-4. **Load Media Roll**: Insert 60 × 25 mm jewellery butterfly label roll. Ensure thermal ribbon is loaded smoothly if using thermal transfer mode.
-5. **Measure Roll Dimensions**: Confirm physical width (60 mm), height (25 mm), and gap between labels (3 mm).
+4. **Load Media Roll**: Insert the Montex Gold 81 × 12 mm, one-up tag roll. Use the correct ribbon/media combination for the printer and label coating.
+5. **Measure Roll Dimensions**: Confirm the 81 mm tag length across the roll, 12 mm feed height, and the actual gap between tags.
 6. **Calibrate Sensor**:
    - Turn printer power OFF.
    - Press and hold the **FEED** button while turning power ON.
    - Hold until red LED flashes, then release. The printer will feed 2-3 labels to automatically calibrate the gap sensor.
 7. **Configure Printer Settings in ERP**:
    - Go to ERP **Settings** -> **TVS LP 46 Dlite Printer Settings**.
-   - Set Width: `60 mm`, Height: `25 mm`, Gap: `3 mm`, Density: `10`, Speed: `4`.
+   - Set Width: `81 mm`, Height: `12 mm`, Gap: measured value (default `3 mm`), Density: `10`, Speed: `4`.
 8. **Print ERP Test Label**: Click **Print Test Label (TVS LP 46 Dlite)**.
-9. **Verify Text & Barcode Alignment**: Check that text is clear, centered on wings, and does not print across the middle adhesive loop.
-10. **Scan Barcode**: Use your USB barcode scanner to scan the printed tag barcode (`SGD26RG00001`).
-11. **Verify ERP Item Lookup**: Open `/billing`, scan the tag, and confirm the item automatically loads into the cart.
+9. **Verify Text & Barcode Alignment**: Check the Code 128 bars and the readable tag number fit in the printable section; confirm the weight and purity text is legible.
+10. **Set Up the Scanner**: Connect the BS-L100 Plus by USB. Use HID/keyboard mode and set an Enter suffix if the scanner is not already sending one. No browser plugin is required.
+11. **Verify ERP Item Lookup**: Open `/billing`, click or focus the `SCAN BARCODE` field, scan the tag, and confirm the item loads into the bill. After adding, the field returns to focus for the next scan.
 12. **Print Batch Test**: Select 5 items in Stock Inventory and click **Bulk Print Selected**.
 13. **Alignment Audit**: Verify that all 5 tags print sequentially without skipping labels or drifting off margin.
 
@@ -82,9 +85,9 @@ Follow this 13-step checklist before beginning production label printing:
 - **Cause**: Thermal density too low (faint print) or quiet zone space too narrow.
 - **Solution**: Increase Print Density to `12` or `14` in Printer Settings. Ensure Code 128 narrow bar is at least 2 dots wide.
 
-### Issue D: Text Printing Across Adhesive Tail
-- **Cause**: Template elements configured inside the unprintable 28-32 mm center loop zone.
-- **Solution**: Open **Label Template Designer** in ERP Settings and adjust element X coordinates to remain within Wing 1 (0-28 mm) or Wing 2 (32-60 mm).
+### Issue D: Text or Barcode Prints Outside the Printable Area
+- **Cause**: Tag feed direction, gap, or template alignment does not match the loaded roll.
+- **Solution**: Calibrate the media, confirm the 81 × 12 mm size and measured gap, then print a single test tag before a batch. The supplied template keeps barcode and item text within the 55 mm printable area.
 
 ---
 

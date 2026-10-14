@@ -8,6 +8,7 @@ import {
   DEFAULT_TEMPLATES,
   generateTsplLabel,
   LEGACY_GOLD_DUAL_TEMPLATE_NAME,
+  MONTEX_GOLD_81X12_TEMPLATE,
   type ItemPrintData,
   type LabelElement,
   type LabelTemplateConfig,
@@ -53,13 +54,21 @@ async function ensurePrinterSettings(shopId: string) {
         offsetX: 0,
         offsetY: 0,
         copies: 1,
-        labelWidthMm: 60,
-        labelHeightMm: 25,
+        labelWidthMm: 81,
+        labelHeightMm: 12,
         gapMm: 3,
         agentUrl: "http://127.0.0.1:9191",
         agentToken: "surya-print-secret-token",
         isDefault: true,
       },
+    });
+  }
+
+  // Upgrade the original factory defaults to the jewellery tags now in use.
+  if (settings.labelWidthMm === 60 && settings.labelHeightMm === 25 && settings.gapMm === 3) {
+    settings = await prisma.printerSettings.update({
+      where: { id: settings.id },
+      data: { labelWidthMm: 81, labelHeightMm: 12 },
     });
   }
 
@@ -90,8 +99,8 @@ export async function savePrinterSettingsAction(
     offsetX: Number(data.offsetX ?? 0),
     offsetY: Number(data.offsetY ?? 0),
     copies: Number(data.copies ?? 1),
-    labelWidthMm: Number(data.labelWidthMm ?? 60),
-    labelHeightMm: Number(data.labelHeightMm ?? 25),
+    labelWidthMm: Number(data.labelWidthMm ?? 81),
+    labelHeightMm: Number(data.labelHeightMm ?? 12),
     gapMm: Number(data.gapMm ?? 3),
   };
   if (!Object.values(numeric).every(Number.isFinite) ||
@@ -185,6 +194,34 @@ export async function getLabelTemplates(shopId = "default") {
   const session = await getSession();
   if (!session) throw new Error("Sign in to view label templates.");
 
+  const montexTemplate = await prisma.labelTemplate.findUnique({
+    where: { id: MONTEX_GOLD_81X12_TEMPLATE.id },
+  });
+  if (!montexTemplate) {
+    await prisma.labelTemplate.updateMany({ where: { shopId, isDefault: true }, data: { isDefault: false } });
+    await prisma.labelTemplate.upsert({
+      where: { id: MONTEX_GOLD_81X12_TEMPLATE.id },
+      update: {},
+      create: {
+        id: MONTEX_GOLD_81X12_TEMPLATE.id,
+        shopId,
+        name: MONTEX_GOLD_81X12_TEMPLATE.name,
+        category: MONTEX_GOLD_81X12_TEMPLATE.category,
+        widthMm: MONTEX_GOLD_81X12_TEMPLATE.widthMm,
+        heightMm: MONTEX_GOLD_81X12_TEMPLATE.heightMm,
+        gapMm: MONTEX_GOLD_81X12_TEMPLATE.gapMm,
+        columnsAcross: 1,
+        rollWidthMm: 81,
+        colGapMm: 0,
+        leftWingWidthMm: 0,
+        rightWingWidthMm: 0,
+        tailWidthMm: 26,
+        elements: JSON.stringify(MONTEX_GOLD_81X12_TEMPLATE.elements),
+        isDefault: true,
+      },
+    });
+  }
+
   const dbTemplates = await prisma.labelTemplate.findMany({
     where: { shopId },
     orderBy: { createdAt: "desc" },
@@ -209,7 +246,7 @@ export async function getLabelTemplates(shopId = "default") {
             rightWingWidthMm: tmpl.rightWingWidthMm ?? 28,
             tailWidthMm: tmpl.tailWidthMm ?? 4,
             elements: JSON.stringify(tmpl.elements),
-            isDefault: tmpl.id === "preset-gold-butterfly-60x25",
+            isDefault: tmpl.id === MONTEX_GOLD_81X12_TEMPLATE.id,
           },
         })
       )

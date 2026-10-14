@@ -69,12 +69,11 @@ DENSITY ${settings.density}
 DIRECTION ${settings.orientation}
 REFERENCE ${settings.offsetX},${settings.offsetY}
 CLS
-TEXT 16,16,"2",0,1,1,"SURYA GOLD & DIAMONDS"
-TEXT 16,48,"2",0,1,1,"TEST TAG: SGD26RG00001"
-BARCODE 16,80,"128",80,0,0,2,4,"SGD26RG00001"
-TEXT 250,16,"2",0,1,1,"22K916"
-TEXT 250,48,"1",0,1,1,"GW: 4.520g"
-TEXT 250,72,"1",0,1,1,"NW: 4.200g"
+BARCODE 16,4,"128",52,0,0,2,4,"SGD26RG00001"
+TEXT 16,59,"1",0,1,1,"SGD26RG00001"
+TEXT 248,59,"1",0,1,1,"GOLD 22K916"
+TEXT 16,77,"1",0,1,1,"GW: 4.520g"
+TEXT 248,77,"1",0,1,1,"NW: 4.200g"
 PRINT 1,1
 `.trim();
 
@@ -197,6 +196,9 @@ PRINT 1,1
           <h2 className="text-lg font-bold text-gold-bright border-b border-white/10 pb-3">
             Hardware & Spooler Configuration
           </h2>
+          <p className="-mt-3 text-xs leading-5 text-cream/60">
+            The default label is Montex Gold jewellery stock, 81 × 12 mm, one tag across, 1-inch core (SKU LBC8910261125/3). The BS-L100 Plus scanner enters Code 128 tags in the focused billing scan box; configure its USB mode as keyboard/HID with Enter suffix.
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

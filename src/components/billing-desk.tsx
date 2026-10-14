@@ -138,6 +138,8 @@ export function BillingDesk({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tag, setTag] = useState("");
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const tagLookupInFlight = useRef(false);
   const [stockQuery, setStockQuery] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [hits, setHits] = useState<CustomerHit[]>([]);
@@ -208,20 +210,29 @@ export function BillingDesk({
 
   async function addByTag(event?: React.FormEvent) {
     if (event) event.preventDefault();
+    if (tagLookupInFlight.current) return;
     setError(null);
     const cleanedTag = tag.trim().toUpperCase();
     if (!cleanedTag) return;
-    const result = await lookupTagAction(cleanedTag);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    tagLookupInFlight.current = true;
+    try {
+      const result = await lookupTagAction(cleanedTag);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      if (items.some((item) => item.ornamentId && item.ornamentId === result.item.ornamentId)) {
+        setError(`Tag ${cleanedTag} is already on this bill.`);
+        return;
+      }
+      setItems((current) => [...current, { key: uid(), ...result.item }]);
+      setTag("");
+    } catch {
+      setError("Could not look up that tag. Check the connection and scan again.");
+    } finally {
+      tagLookupInFlight.current = false;
+      window.setTimeout(() => tagInputRef.current?.focus(), 0);
     }
-    if (items.some((item) => item.ornamentId && item.ornamentId === result.item.ornamentId)) {
-      setError(`Tag ${cleanedTag} is already on this bill.`);
-      return;
-    }
-    setItems((current) => [...current, { key: uid(), ...result.item }]);
-    setTag("");
   }
 
   function addStockItem(stockItem: StockItem) {
@@ -452,13 +463,18 @@ export function BillingDesk({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-xl">Ornaments</h2>
-              <p className="text-xs text-stone">Scan or type a tag number, or add a loose item.</p>
+              <p className="text-xs text-stone">Scan a Code 128 tag with the USB scanner or type its number. Keep this field focused; Enter adds the item.</p>
             </div>
             <form className="flex w-full sm:w-auto flex-wrap sm:flex-nowrap gap-2" onSubmit={addByTag}>
               <Input
+                inputRef={tagInputRef}
+                autoFocus
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
                 value={tag}
                 onChange={(e) => setTag(e.target.value.toUpperCase())}
-                placeholder="TAG NO"
+                placeholder="SCAN BARCODE"
                 className="w-full sm:w-36 uppercase"
               />
               <Button type="submit" variant="secondary" size="sm" className="flex-1 sm:flex-none">

@@ -80,9 +80,29 @@ export function mmToDots(mm: number, dpi: number = 203): number {
   return Math.round((mm * dpi) / 25.4);
 }
 
-/**
- * Default preset label templates for 60x25 mm Butterfly / Dumbbell Tags & Standard Rectangular Tags.
- */
+/** Default tag profile for Montex Gold jewellery stock, printed one-up on an 81×12 mm strip. */
+export const MONTEX_GOLD_81X12_TEMPLATE: LabelTemplateConfig = {
+  id: "preset-montex-gold-81x12-v1",
+  name: "Montex Gold Jewellery Tag (81×12 mm, 1-up)",
+  category: "GOLD",
+  widthMm: 81,
+  heightMm: 12,
+  gapMm: 3,
+  columnsAcross: 1,
+  rollWidthMm: 81,
+  colGapMm: 0,
+  leftWingWidthMm: 0,
+  rightWingWidthMm: 0,
+  tailWidthMm: 26,
+  elements: [
+    { id: "montex-barcode", fieldKey: "barcode", xMm: 2, yMm: 0.5, widthMm: 51, heightMm: 6.5, isVisible: true, rotation: 0 },
+    { id: "montex-tag-no", fieldKey: "tagNo", xMm: 2, yMm: 7.4, fontSize: 1, fontStyle: "bold", isVisible: true, rotation: 0 },
+    { id: "montex-purity", fieldKey: "purity", xMm: 31, yMm: 7.4, fontSize: 1, isVisible: true, rotation: 0 },
+    { id: "montex-gross", fieldKey: "grossWeight", xMm: 2, yMm: 9.6, fontSize: 1, isVisible: true, rotation: 0 },
+    { id: "montex-net", fieldKey: "netWeight", xMm: 31, yMm: 9.6, fontSize: 1, isVisible: true, rotation: 0 },
+  ],
+};
+
 export const DEFAULT_TEMPLATES: LabelTemplateConfig[] = [
   {
     id: "preset-gold-butterfly-60x25",
@@ -178,6 +198,7 @@ export const DEFAULT_TEMPLATES: LabelTemplateConfig[] = [
       { id: "e7", fieldKey: "huid", xMm: 27, yMm: 15, fontSize: 1, isVisible: true, rotation: 0 },
     ],
   },
+  MONTEX_GOLD_81X12_TEMPLATE,
 ];
 
 /**

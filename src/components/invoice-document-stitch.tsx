@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { amountInWords, formatDate, grams, inr, num } from "@/lib/money";
+import styles from "./invoice-document-stitch.module.css";
 
 export type InvoiceDoc = {
   id?: string; invoiceNo: string; date: Date | string; status: string;
@@ -73,7 +74,7 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
   const supplierAddress = [shop.address, shop.city, shop.state, shop.pincode].filter(Boolean).join(", ");
   const print = (selected: typeof mode) => { setMode(selected); window.setTimeout(() => window.print(), 100); };
 
-  return <div className="sg-invoice-wrap">
+  return <div className={`sg-invoice-wrap ${styles.readablePrint}`}>
     <div className="no-print sg-invoice-toolbar">
       <div><strong>Invoice {invoice.invoiceNo}</strong><span>Choose a side. Your Windows print window lets you select an installed printer.</span></div>
       <div className="sg-actions">
@@ -98,7 +99,7 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
         <div><span className="sg-label">PLACE OF SUPPLY</span><strong>{invoice.placeOfSupply || [shop.city, shop.state].filter(Boolean).join(", ") || "—"}</strong></div>
       </section>
 
-      <div className="sg-table-wrap"><table className="sg-items"><thead><tr><th>#</th><th>ITEM DESCRIPTION</th><th>PURITY</th><th>GROSS</th><th>STONE</th><th>NET WT</th><th>RATE / G</th><th>MAKING</th><th>VAT</th><th className="right">AMOUNT</th></tr></thead>
+      <div className="sg-table-wrap"><table className="sg-items"><thead><tr><th>#</th><th>ITEM DESCRIPTION</th><th>PURITY</th><th>GROSS</th><th>STONE</th><th>NET WT</th><th>RATE / G</th><th>MAKING</th><th>VA</th><th className="right">AMOUNT</th></tr></thead>
         <tbody>{invoice.items.map((item, i) => <tr key={`${item.tagNo}-${i}`}>
           <td>{String(i + 1).padStart(2, "0")}</td><td><strong>{item.description || item.category || item.metal || "Jewellery"}</strong><small>{[item.tagNo && `Tag ${item.tagNo}`, item.hsn && `HSN ${item.hsn}`, item.huid && `HUID ${item.huid}`].filter(Boolean).join(" · ")}</small></td>
           <td>{item.purity || item.metal || "—"}</td><td>{grams(num(item.grossWeight))} g</td><td>{grams(num(item.stoneWeight))} g</td><td>{grams(num(item.netWeight))} g</td><td>{cash(item.ratePerGram)}</td><td>{cash(item.makingAmount)}</td><td>{cash((Math.round(num(item.taxable3) * 0.015 * 100) * 2 + Math.round(num(item.taxable5) * 0.025 * 100) * 2) / 100)}</td><td className="right">{cash(item.lineTotal)}</td>

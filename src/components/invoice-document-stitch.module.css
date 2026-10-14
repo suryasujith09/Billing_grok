@@ -1,0 +1,71 @@
+.readablePrint :global(.sg-items) {
+  font-size: 8.1pt !important;
+}
+
+.readablePrint :global(.sg-items th) {
+  font-size: 7.4pt !important;
+  padding: 1.6mm 0.8mm !important;
+  white-space: normal;
+}
+
+.readablePrint :global(.sg-items td) {
+  padding: 1.8mm 0.8mm !important;
+}
+
+.readablePrint :global(.sg-exchange) {
+  font-size: 6.4pt !important;
+}
+
+.readablePrint :global(.sg-exchange th) {
+  font-size: 5.9pt !important;
+}
+
+.readablePrint :global(.sg-terms-grid) {
+  grid-template-columns: 1fr 1fr !important;
+}
+
+.readablePrint :global(.sg-term ul),
+.readablePrint :global(.sg-buyback-table table) {
+  font-size: 8pt !important;
+  line-height: 1.3 !important;
+}
+
+@media print {
+  .readablePrint :global(.sg-sheet) {
+    overflow: hidden !important;
+  }
+
+  .readablePrint :global(.sg-items) {
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .readablePrint :global(.sg-items th:nth-child(2)) {
+    width: 24% !important;
+  }
+
+  .readablePrint :global(.sg-items th:nth-child(9)) {
+    width: 8% !important;
+  }
+
+  .readablePrint :global(.sg-items th:nth-child(10)) {
+    width: 14% !important;
+  }
+
+  .readablePrint :global(.sg-lower) {
+    grid-template-columns: 1.05fr 0.95fr !important;
+  }
+
+  .readablePrint :global(.sg-terms-grid) {
+    grid-template-columns: 1fr 1fr !important;
+    padding-bottom: 10mm !important;
+  }
+
+  .readablePrint :global(.sg-buyback-table) {
+    grid-column: 2 !important;
+  }
+
+  .readablePrint :global(.sg-term ul) {
+    gap: 1.2mm !important;
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import {
@@ -140,6 +140,8 @@ export function BillingDesk({
   const [tag, setTag] = useState("");
   const tagInputRef = useRef<HTMLInputElement>(null);
   const tagLookupInFlight = useRef(false);
+  const scannerIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scannerBurst = useRef({ lastKeyAt: 0, fastKeyCount: 0 });
   const [stockQuery, setStockQuery] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [hits, setHits] = useState<CustomerHit[]>([]);
@@ -147,6 +149,10 @@ export function BillingDesk({
   const [customerSearchError, setCustomerSearchError] = useState(false);
   const customerSearchSequence = useRef(0);
   const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (scannerIdleTimer.current) clearTimeout(scannerIdleTimer.current);
+    if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+  }, []);
   const [customerId, setCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -210,10 +216,14 @@ export function BillingDesk({
 
   async function addByTag(event?: React.FormEvent) {
     if (event) event.preventDefault();
+    if (scannerIdleTimer.current) clearTimeout(scannerIdleTimer.current);
+    scannerIdleTimer.current = null;
     if (tagLookupInFlight.current) return;
     setError(null);
     const cleanedTag = tag.trim().toUpperCase();
     if (!cleanedTag) return;
+    const cameFromScanner = scannerBurst.current.fastKeyCount >= 3;
+    scannerBurst.current = { lastKeyAt: 0, fastKeyCount: 0 };
     tagLookupInFlight.current = true;
     try {
       const result = await lookupTagAction(cleanedTag);
@@ -230,9 +240,33 @@ export function BillingDesk({
     } catch {
       setError("Could not look up that tag. Check the connection and scan again.");
     } finally {
+      if (cameFromScanner) setTag("");
       tagLookupInFlight.current = false;
       window.setTimeout(() => tagInputRef.current?.focus(), 0);
     }
+  }
+
+  function trackScannerKey(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key.length !== 1 || event.ctrlKey || event.altKey || event.metaKey) return;
+    const now = Date.now();
+    scannerBurst.current = {
+      lastKeyAt: now,
+      fastKeyCount: now - scannerBurst.current.lastKeyAt <= 70
+        ? scannerBurst.current.fastKeyCount + 1
+        : 1,
+    };
+  }
+
+  function updateTagInput(value: string) {
+    const nextTag = value.toUpperCase();
+    setTag(nextTag);
+    if (scannerIdleTimer.current) clearTimeout(scannerIdleTimer.current);
+    scannerIdleTimer.current = null;
+    if (nextTag.trim().length < 3 || scannerBurst.current.fastKeyCount < 3) return;
+    scannerIdleTimer.current = setTimeout(() => {
+      scannerIdleTimer.current = null;
+      void addByTag();
+    }, 130);
   }
 
   function addStockItem(stockItem: StockItem) {
@@ -463,7 +497,7 @@ export function BillingDesk({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-xl">Ornaments</h2>
-              <p className="text-xs text-stone">Scan a Code 128 tag with the USB scanner or type its number. Keep this field focused; Enter adds the item.</p>
+              <p className="text-xs text-stone">Scan a Code 128 tag to add it automatically, or type the tag and press Enter.</p>
             </div>
             <form className="flex w-full sm:w-auto flex-wrap sm:flex-nowrap gap-2" onSubmit={addByTag}>
               <Input
@@ -473,7 +507,8 @@ export function BillingDesk({
                 autoCapitalize="characters"
                 spellCheck={false}
                 value={tag}
-                onChange={(e) => setTag(e.target.value.toUpperCase())}
+                onKeyDown={trackScannerKey}
+                onChange={(e) => updateTagInput(e.target.value)}
                 placeholder="SCAN BARCODE"
                 className="w-full sm:w-36 uppercase"
               />

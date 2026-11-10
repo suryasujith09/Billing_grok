@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
+    "@vercel/analytics": "^2.0.1",
     "jose": "^6.2.9",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^1.31.0",

@@ -6,6 +6,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { updateInvoiceAction } from "@/lib/actions";
 import { Button, Card, ErrorBanner, Field, Input, Textarea } from "@/components/ui";
 import type { DiscountMode } from "@/lib/invoice-calc";
+import { DEFAULT_HSN_CODES, HSN_CODE_STORAGE_KEY, type HsnCode } from "@/lib/hsn-codes";
 
 type EditLine = {
   ornamentId: string | null;
@@ -62,6 +63,34 @@ export function InvoiceEditForm({ invoice }: { invoice: InvoiceEditDraft }) {
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const [hsnCodes, setHsnCodes] = useState<HsnCode[]>([...DEFAULT_HSN_CODES]);
+
+  function loadSavedHsnCodes() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(HSN_CODE_STORAGE_KEY) ?? "[]") as unknown;
+      if (!Array.isArray(stored)) return;
+      const custom = stored.filter((entry): entry is HsnCode =>
+        typeof entry === "object" && entry !== null &&
+        "code" in entry && typeof entry.code === "string" && entry.code.trim() !== "" &&
+        "description" in entry && typeof entry.description === "string",
+      );
+      setHsnCodes([...DEFAULT_HSN_CODES, ...custom.filter((entry) => !DEFAULT_HSN_CODES.some((defaultCode) => defaultCode.code === entry.code))]);
+    } catch {
+      // Keep the built-in codes if local storage is unavailable or malformed.
+    }
+  }
+
+  function rememberHsnCode(rawCode: string) {
+    const code = rawCode.trim();
+    if (!code || hsnCodes.some((entry) => entry.code.toLocaleLowerCase() === code.toLocaleLowerCase())) return;
+    const updated = [...hsnCodes, { code, description: "Custom HSN code" }];
+    setHsnCodes(updated);
+    try {
+      window.localStorage.setItem(HSN_CODE_STORAGE_KEY, JSON.stringify(updated.filter((entry) => !DEFAULT_HSN_CODES.some((defaultCode) => defaultCode.code === entry.code))));
+    } catch {
+      // The code remains available while editing if local storage is unavailable.
+    }
+  }
 
   function update<K extends keyof InvoiceEditDraft>(key: K, next: InvoiceEditDraft[K]) {
     setDraft((current) => ({
@@ -83,6 +112,11 @@ export function InvoiceEditForm({ invoice }: { invoice: InvoiceEditDraft }) {
     setError("");
     if (!draft.invoiceNo.trim()) {
       setError("Enter an invoice number.");
+      return;
+    }
+    const missingHsnIndex = draft.items.findIndex((item) => !item.hsn.trim());
+    if (missingHsnIndex !== -1) {
+      setError(`Enter an HSN code for item ${missingHsnIndex + 1}.`);
       return;
     }
     if (draft.invoiceNo.length > 16 || !/^[A-Za-z0-9/-]+$/.test(draft.invoiceNo.trim())) {
@@ -128,6 +162,9 @@ export function InvoiceEditForm({ invoice }: { invoice: InvoiceEditDraft }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
+      <datalist id="invoice-edit-hsn-codes">
+        {hsnCodes.map((entry) => <option key={entry.code} value={entry.code} label={entry.description} />)}
+      </datalist>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-semibold uppercase tracking-wider text-stone">Admin invoice editor</p><h1 className="font-display text-2xl text-ink">{draft.invoiceNo}</h1></div>
         <div className="flex gap-2">
@@ -179,6 +216,7 @@ export function InvoiceEditForm({ invoice }: { invoice: InvoiceEditDraft }) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Description"><Input value={item.description} onChange={(e) => updateLine(index, "description", e.target.value)} /></Field>
+            <Field label="HSN code *" hint="Required. Choose a listed code or type a new code; new codes are saved in this browser for reuse."><Input required list="invoice-edit-hsn-codes" value={item.hsn} onFocus={loadSavedHsnCodes} onChange={(e) => updateLine(index, "hsn", e.target.value)} onBlur={(e) => rememberHsnCode(e.target.value)} /></Field>
             <Field label="HUID"><Input value={item.huid} onChange={(e) => updateLine(index, "huid", e.target.value)} /></Field>
             <Field label="Gross weight (g)"><Input type="number" step="0.001" value={item.grossWeight} onChange={(e) => updateLine(index, "grossWeight", e.target.value)} /></Field>
             <Field label="Stone weight (g)"><Input type="number" step="0.001" value={item.stoneWeight} onChange={(e) => updateLine(index, "stoneWeight", e.target.value)} /></Field>

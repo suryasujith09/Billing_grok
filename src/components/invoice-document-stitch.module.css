@@ -5,7 +5,6 @@
 .readablePrint :global(.sg-items th) {
   font-size: 7.4pt !important;
   padding: 1.6mm 0.8mm !important;
-  white-space: normal;
 }
 
 .readablePrint :global(.sg-items td) {
@@ -38,23 +37,6 @@
   .readablePrint :global(.sg-items) {
     min-width: 0 !important;
     table-layout: fixed !important;
-  }
-
-  .readablePrint :global(.sg-items th:nth-child(2)) {
-    width: 22% !important;
-  }
-
-  .readablePrint :global(.sg-items th:nth-child(3)) {
-    width: 9% !important;
-  }
-
-  .readablePrint :global(.sg-items th:nth-child(9)),
-  .readablePrint :global(.sg-items th:nth-child(10)) {
-    width: 7% !important;
-  }
-
-  .readablePrint :global(.sg-items th:nth-child(11)) {
-    width: 11% !important;
   }
 
   .readablePrint :global(.sg-lower) {

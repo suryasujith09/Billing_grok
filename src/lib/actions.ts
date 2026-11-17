@@ -135,7 +135,7 @@ const lineSchema = z.object({
   ornamentId: z.string().optional().nullable(),
   tagNo: z.string().optional().default(""),
   description: z.string().min(1),
-  hsn: z.string().optional().default("7113"),
+  hsn: z.string().trim().min(1, "HSN code is required").max(32),
   huid: z.string().optional().default(""),
   metal: z.string().min(1),
   purity: z.string().min(1),
@@ -243,6 +243,7 @@ function invoiceValidationMessage(issue: { path: PropertyKey[]; message: string 
   if (itemIndex != null) {
     const label: Record<string, string> = {
       description: "description",
+      hsn: "HSN code",
       grossWeight: "gross weight",
       stoneWeight: "stone weight",
       netWeight: "net weight",

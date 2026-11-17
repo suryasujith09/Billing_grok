@@ -28,6 +28,7 @@ import {
 } from "@/lib/invoice-calc";
 import { addAnotherStockUnitAction, createCustomerFromBillingAction, createInvoiceAction, getCustomerPurchaseHistoryAction, getUnusedInvoiceSerialsAction, lookupTagAction, searchAvailableStockAction, searchCustomersAction } from "@/lib/actions";
 import { amountInWords, inr, padInvoice, r2 } from "@/lib/money";
+import { DEFAULT_HSN_CODES, HSN_CODE_STORAGE_KEY, type HsnCode } from "@/lib/hsn-codes";
 import { Button, Card, ErrorBanner, Field, Input, Select, Textarea } from "./ui";
 
 type RateRow = { metal: string; purity: string; ratePerGram: number };
@@ -121,7 +122,7 @@ function emptyLine(rates: RateRow[]): Line {
     ornamentId: null,
     tagNo: "",
     description: "",
-    hsn: "7113",
+    hsn: "",
     huid: "",
     metal: "GOLD",
     purity: "22K",
@@ -278,6 +279,7 @@ export function BillingDesk({
   const [discountInputMode, setDiscountInputMode] = useState<DiscountMode>("PERCENT");
   const [invoiceTotalInput, setInvoiceTotalInput] = useState("");
   const [items, setItems] = useState<Line[]>([]);
+  const [hsnCodes, setHsnCodes] = useState<HsnCode[]>([...DEFAULT_HSN_CODES]);
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [payments, setPayments] = useState<Pay[]>([
     { key: uid(), method: "UPI", amount: 0, reference: "" },
@@ -294,6 +296,21 @@ export function BillingDesk({
       .finally(() => { if (active) setLoadingInvoiceSerials(false); });
     return () => { active = false; };
   }, [canManageInvoiceNumbers, numberingMode, invoiceType]);
+
+  function loadSavedHsnCodes() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(HSN_CODE_STORAGE_KEY) ?? "[]") as unknown;
+      if (!Array.isArray(stored)) return;
+      const custom = stored.filter((entry): entry is HsnCode =>
+        typeof entry === "object" && entry !== null &&
+        "code" in entry && typeof entry.code === "string" && entry.code.trim() !== "" &&
+        "description" in entry && typeof entry.description === "string",
+      );
+      setHsnCodes([...DEFAULT_HSN_CODES, ...custom.filter((entry) => !DEFAULT_HSN_CODES.some((defaultCode) => defaultCode.code === entry.code))]);
+    } catch {
+      // Keep the built-in codes if local storage is unavailable or malformed.
+    }
+  }
 
   const computed = useMemo(() => {
     const lines = items.map((item) => ({
@@ -373,6 +390,18 @@ export function BillingDesk({
     );
   }
 
+  function rememberHsnCode(rawCode: string) {
+    const code = rawCode.trim();
+    if (!code || hsnCodes.some((entry) => entry.code.toLocaleLowerCase() === code.toLocaleLowerCase())) return;
+    const updated = [...hsnCodes, { code, description: "Custom HSN code" }];
+    setHsnCodes(updated);
+    try {
+      window.localStorage.setItem(HSN_CODE_STORAGE_KEY, JSON.stringify(updated.filter((entry) => !DEFAULT_HSN_CODES.some((defaultCode) => defaultCode.code === entry.code))));
+    } catch {
+      // The code remains available for this invoice if local storage is unavailable.
+    }
+  }
+
   function patchLineDiscount(key: string, discountMode: DiscountMode, rawValue: string) {
     const item = items.find((row) => row.key === key);
     if (!item) return;
@@ -424,6 +453,7 @@ export function BillingDesk({
       setItems((current) => [...current, {
         key: uid(),
         ...result.item,
+        hsn: "",
         pricingMode: result.item.mrp != null && result.item.mrp > 0 ? "MRP" : result.item.pricingMode,
         finalPrice: result.item.mrp != null && result.item.mrp > 0 ? result.item.mrp : result.item.finalPrice,
       }]);
@@ -469,6 +499,7 @@ export function BillingDesk({
     setItems((current) => [...current, {
       key: uid(),
       ...stockItem,
+      hsn: "",
       pricingMode: stockItem.mrp != null && stockItem.mrp > 0 ? "MRP" : stockItem.pricingMode,
       finalPrice: stockItem.mrp != null && stockItem.mrp > 0 ? stockItem.mrp : stockItem.finalPrice,
     }]);
@@ -649,6 +680,11 @@ export function BillingDesk({
       setError("Add at least one ornament or loose item.");
       return;
     }
+    const missingHsnIndex = items.findIndex((item) => !item.hsn.trim());
+    if (missingHsnIndex !== -1) {
+      setError(`Enter an HSN code for item ${missingHsnIndex + 1}.`);
+      return;
+    }
     if (invoiceType === "BILL_OF_SUPPLY" && !billOfSupplyReason.trim()) {
       setError("Add the reason for issuing this Bill of Supply.");
       return;
@@ -745,6 +781,9 @@ export function BillingDesk({
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <datalist id="invoice-hsn-codes">
+        {hsnCodes.map((entry) => <option key={entry.code} value={entry.code} label={entry.description} />)}
+      </datalist>
       <div className="space-y-5">
         <Card>
           <h2 className="font-display text-xl">Invoice type and number</h2>
@@ -1042,6 +1081,17 @@ export function BillingDesk({
                       <Input
                         value={item.description}
                         onChange={(e) => patchLine(item.key, { description: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="HSN code *" hint="Required. Choose a listed code or type a new code; new codes are saved in this browser for reuse.">
+                      <Input
+                        required
+                        list="invoice-hsn-codes"
+                        value={item.hsn}
+                        onFocus={loadSavedHsnCodes}
+                        onChange={(e) => patchLine(item.key, { hsn: e.target.value })}
+                        onBlur={(e) => rememberHsnCode(e.target.value)}
+                        placeholder="Select or enter an HSN code"
                       />
                     </Field>
                     {(item.metal === "DIAMOND" || item.metal === "GOLD_PLATED") ? (

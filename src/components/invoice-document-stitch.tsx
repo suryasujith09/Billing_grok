@@ -120,24 +120,26 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
           {num(invoice.roundOff) !== 0 && <div className="sg-line"><span>Round off</span><strong>{cash(invoice.roundOff)}</strong></div>}
           <div className="sg-grand"><span>Invoice total</span><strong>{cash(invoice.grandTotal)}</strong></div>
           {num(invoice.oldGoldValue) > 0 && <div className="sg-line"><span>Less: exchange credit</span><strong>− {cash(invoice.oldGoldValue)}</strong></div>}
-          <div className="sg-payable"><span>NET PAYABLE</span><strong>{cash(invoice.netPayable)}</strong></div>
+          <div className="sg-payable"><span>NET PAYABLE{num(invoice.oldGoldValue) > 0 && <small>{cash(invoice.grandTotal)} bill total − {cash(invoice.oldGoldValue)} exchange credit</small>}</span><strong>{cash(invoice.netPayable)}</strong></div>
           <div className="sg-line"><span>Paid</span><strong>{cash(invoice.paidAmount)}</strong></div>
           <div className={`sg-line ${due > 0 ? "sg-due" : ""}`}><span>{due > 0 ? "Balance due" : "Balance"}</span><strong>{cash(due)}</strong></div>
         </section>
       </div>
       {invoice.exchanges.length > 0 && <div className="sg-exchange-wrap">
         <h3>Old metal &amp; diamond exchange</h3>
-        <table className="sg-exchange"><thead><tr><th>Metal / item</th><th>Qty</th><th>Gross wt</th><th>Net wt</th><th>Rate</th><th>Amount</th><th>Dust wt</th><th>Wastage wt</th><th>Final net wt</th><th>Final amount</th></tr></thead>
+        <table className="sg-exchange"><thead><tr><th>Metal / item</th><th>Qty</th><th>Net wt</th><th>Rate</th><th>Weight × rate</th><th>Dust + wastage</th><th>Final net wt</th><th>Final exchange credit</th></tr></thead>
           <tbody>{invoice.exchanges.map((ex, i) => {
             const finalNet = Math.max(0, num(ex.netWeight) - num(ex.dustWeight) - num(ex.wastageWeight));
             const isDiamond = ex.metal === "DIAMOND";
             const unit = isDiamond ? "ct" : "g";
             return <tr key={`exchange-${i}`}>
               <td>{ex.description}<small>{[ex.metal, ex.purity].filter(Boolean).join(" · ")}</small></td>
-              <td>{ex.quantity ?? 1}</td><td>{grams(num(ex.grossWeight))} {unit}</td><td>{grams(num(ex.netWeight))} {unit}</td>
-              <td>{cash(ex.ratePerGram)} / {unit}</td><td>{cash(num(ex.netWeight) * num(ex.ratePerGram))}</td>
-              <td>{grams(num(ex.dustWeight))} {unit}</td><td>{grams(num(ex.wastageWeight))} {unit}</td>
-              <td>{grams(finalNet)} {unit}</td><td>{cash(ex.amount)}</td>
+              <td>{ex.quantity ?? 1}</td><td>{grams(num(ex.netWeight))} {unit}</td>
+              <td>{cash(ex.ratePerGram)} / {unit}</td>
+              <td>{cash(num(ex.netWeight) * num(ex.ratePerGram))}<small>{grams(num(ex.netWeight))} {unit} × {cash(ex.ratePerGram)} / {unit}</small></td>
+              <td>{grams(num(ex.dustWeight) + num(ex.wastageWeight))} {unit}<small>{grams(num(ex.dustWeight))} dust · {grams(num(ex.wastageWeight))} wastage</small></td>
+              <td>{grams(finalNet)} {unit}</td>
+              <td>{cash(ex.amount)}<small>{grams(finalNet)} {unit} × {cash(ex.ratePerGram)} / {unit}</small></td>
             </tr>;
           })}</tbody>
         </table>

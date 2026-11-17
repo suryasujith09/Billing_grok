@@ -1322,7 +1322,7 @@ export function BillingDesk({
                     <Field label="Wastage wt"><Input type="number" min="0" max={Math.max(0, ex.netWeight - ex.dustWeight)} step="0.001" value={ex.wastageWeight || ""} onChange={(event) => patchExchange(ex.key, { wastageWeight: Number(event.target.value) })} /></Field>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-sand pt-3 text-xs">
-                    <span>Amount <strong>{inr(ex.amount)}</strong></span>
+                    <span>Weight × rate <strong>{ex.netWeight.toFixed(3)} {ex.metal === "DIAMOND" ? "ct" : "g"} × {inr(ex.ratePerGram)}/{ex.metal === "DIAMOND" ? "ct" : "g"} = {inr(ex.amount)}</strong></span>
                     <span>Final net wt <strong>{ex.finalNetWeight.toFixed(3)} {ex.metal === "DIAMOND" ? "ct" : "g"}</strong></span>
                     <span className="text-ink">Final amount <strong>{inr(ex.finalAmount)}</strong></span>
                     <button type="button" className="ml-auto text-danger" aria-label="Remove exchange" onClick={() => setExchanges((current) => current.filter((row) => row.key !== ex.key))}>
@@ -1409,6 +1409,7 @@ export function BillingDesk({
             />
             <Row label="Less exchange credit" value={inr(computed.totals.oldGoldValue)} />
             <Row label="Net payable" value={inr(computed.totals.netPayable)} strong />
+            {exchanges.length > 0 ? <p className="text-xs text-stone">{inr(computed.totals.grandTotal)} bill total − {inr(computed.totals.oldGoldValue)} final exchange credit = {inr(computed.totals.netPayable)} net payable.</p> : null}
             <Row label="Received" value={inr(computed.totals.paidAmount)} />
             <Row
               label="Balance"

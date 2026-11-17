@@ -558,7 +558,17 @@ export function CancelInvoiceButton({ id }: { id: string }) {
   );
 }
 
-export function DeleteInvoiceButton({ id, invoiceNo }: { id: string; invoiceNo: string }) {
+export function DeleteInvoiceButton({
+  id,
+  invoiceNo,
+  returnPath = "/invoices",
+  renumberBillNumbers = false,
+}: {
+  id: string;
+  invoiceNo: string;
+  returnPath?: string;
+  renumberBillNumbers?: boolean;
+}) {
   const [pending, setPending] = useState(false);
   const router = useRouter();
   return (
@@ -567,13 +577,16 @@ export function DeleteInvoiceButton({ id, invoiceNo }: { id: string; invoiceNo: 
       variant="danger"
       size="sm"
       onClick={async () => {
-        if (!confirm(`Permanently delete invoice ${invoiceNo}, including its items, exchanges, and payments? Tagged items will return to stock. This cannot be undone.`)) return;
+        const renumberNote = renumberBillNumbers
+          ? " Remaining Bills of Supply for this financial year will be renumbered in sequence, and linked credit-note references will be updated."
+          : "";
+        if (!confirm(`Permanently delete invoice ${invoiceNo}, including its items, exchanges, and payments? Tagged items will return to stock.${renumberNote} This cannot be undone.`)) return;
         setPending(true);
         const result = await deleteInvoiceAction(id);
         setPending(false);
         if (!result.ok) alert(result.error);
         else {
-          router.push("/invoices");
+          router.push(returnPath);
           router.refresh();
         }
       }}

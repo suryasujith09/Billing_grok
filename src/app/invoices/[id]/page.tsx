@@ -42,7 +42,12 @@ export default async function InvoiceDetailPage({
                 Edit invoice
               </Link>
             ) : null}
-            {session?.role === "admin" ? <DeleteInvoiceButton id={invoice.id} invoiceNo={invoice.invoiceNo} /> : null}
+            {session?.role === "admin" ? <DeleteInvoiceButton
+              id={invoice.id}
+              invoiceNo={invoice.invoiceNo}
+              returnPath={invoice.invoiceType === "BILL_OF_SUPPLY" ? "/non-gst-invoices" : "/invoices"}
+              renumberBillNumbers={invoice.invoiceType === "BILL_OF_SUPPLY"}
+            /> : null}
             {invoice.status === "FINAL" && balance > 0 ? (
               <div className="flex items-center gap-2 border border-amber-300 bg-amber-50 px-3 py-1.5 rounded-md text-xs">
                 <span className="font-semibold text-amber-900">

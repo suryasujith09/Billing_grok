@@ -1170,10 +1170,56 @@ export async function deleteInvoiceAction(id: string): Promise<ActionState> {
 
       // Invoice items, exchanges, and payments cascade with the invoice.
       await tx.invoice.delete({ where: { id } });
+
+      if (invoice.invoiceType === "BILL_OF_SUPPLY") {
+        const fiscalYear = invoiceFiscalYear(invoice.invoiceNo);
+        if (fiscalYear) {
+          const remainingBills = (await tx.invoice.findMany({
+            where: { invoiceType: "BILL_OF_SUPPLY", invoiceNo: { contains: `/${fiscalYear}/` } },
+            select: { id: true, invoiceNo: true },
+          }))
+            .filter((row) => invoiceFiscalYear(row.invoiceNo) === fiscalYear && invoiceSerialNumber(row.invoiceNo) != null)
+            .sort((a, b) => (invoiceSerialNumber(a.invoiceNo) ?? 0) - (invoiceSerialNumber(b.invoiceNo) ?? 0) || a.invoiceNo.localeCompare(b.invoiceNo));
+
+          // Move numbers to temporary unique values first so reusing a suffix never
+          // collides with an invoice that has not yet been renumbered.
+          for (const row of remainingBills) {
+            await tx.invoice.update({ where: { id: row.id }, data: { invoiceNo: `__renumber__${row.id}` } });
+          }
+
+          for (const [index, row] of remainingBills.entries()) {
+            const newInvoiceNo = row.invoiceNo.replace(/\d+$/, padInvoice(index + 1));
+            await tx.invoice.update({ where: { id: row.id }, data: { invoiceNo: newInvoiceNo } });
+            await tx.creditNote.updateMany({ where: { invoiceId: row.id }, data: { invoiceNo: newInvoiceNo } });
+            await tx.creditNoteAdjustment.updateMany({ where: { invoiceId: row.id }, data: { invoiceNo: newInvoiceNo } });
+            if (newInvoiceNo !== row.invoiceNo && session.employeeId) {
+              await tx.employeeActivity.create({
+                data: {
+                  employeeId: session.employeeId,
+                  employeeCode: session.employeeCode ?? "ADMIN",
+                  employeeName: session.employeeName ?? session.username,
+                  action: "INVOICE_RENUMBERED",
+                  transactionNo: newInvoiceNo,
+                  oldValue: row.invoiceNo,
+                  newValue: newInvoiceNo,
+                },
+              });
+            }
+          }
+
+          const allBills = await tx.invoice.findMany({
+            where: { invoiceType: "BILL_OF_SUPPLY" },
+            select: { invoiceNo: true },
+          });
+          const highestSerial = allBills.reduce((max, row) => Math.max(max, invoiceSerialNumber(row.invoiceNo) ?? 0), 0);
+          await tx.shop.updateMany({ where: { id: "default" }, data: { nextBillOfSupplyNo: highestSerial + 1 } });
+        }
+      }
     });
 
     revalidatePath("/");
     revalidatePath("/invoices");
+    revalidatePath("/non-gst-invoices");
     revalidatePath("/inventory");
     revalidatePath("/reports");
     revalidatePath("/credit-notes");

@@ -178,7 +178,7 @@ export default async function InvoicesPage({
                       >
                         View & Print
                       </Link>
-                      {session?.role === "admin" ? <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoiceNo} /> : null}
+                      {session?.role === "admin" ? <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoiceNo} returnPath="/non-gst-invoices" renumberBillNumbers /> : null}
                       </span>
                     </td>
                   </tr>

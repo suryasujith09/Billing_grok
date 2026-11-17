@@ -29,14 +29,11 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/10 border-2 border-gold/40 mb-4 p-2 shadow-xl shadow-black/30">
-            <img src="/logo.png" alt="Surya Gold & Diamonds" className="w-full h-full object-contain drop-shadow-md" />
-          </div>
           <p className="text-[11px] tracking-[0.35em] text-gold-soft uppercase mb-1">
             Jewellery House
           </p>
           <h1 className="font-display text-3xl font-bold text-gold-bright leading-tight">
-            Surya Gold &amp; Diamonds
+            Twinklestar Gold &amp; Diamonds
           </h1>
           <p className="text-cream/50 text-xs mt-1.5 tracking-wide">
             Counter Billing · GST Invoices · BIS HUID Management

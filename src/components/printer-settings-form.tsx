@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { savePrinterSettingsAction, type PrinterSettingsData } from "@/lib/printer-actions";
+import { checkPrintAgent, sendToPrintAgent } from "@/components/print-agent-client";
 import { Printer, RefreshCw, CheckCircle2, AlertTriangle, Play, ShieldAlert } from "lucide-react";
 
 interface PrinterSettingsProps {
@@ -18,20 +19,9 @@ export function PrinterSettingsForm({ initialSettings }: PrinterSettingsProps) {
   const checkAgentHealth = useCallback(async () => {
     setAgentStatus("checking");
     try {
-      const res = await fetch(`${settings.agentUrl}/status`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAgentStatus("online");
-        if (data.printers && Array.isArray(data.printers)) {
-          setPrinters(data.printers);
-        }
-      } else {
-        setAgentStatus("offline");
-      }
+      const data = await checkPrintAgent(settings.agentUrl);
+      setAgentStatus("online");
+      setPrinters(Array.isArray(data.printers) ? data.printers : []);
     } catch {
       setAgentStatus("offline");
     }
@@ -77,29 +67,22 @@ TEXT 248,77,"1",0,1,1,"NW: 4.200g"
 PRINT 1,1
 `.trim();
 
-      const response = await fetch(`${settings.agentUrl}/print/tspl`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${settings.agentToken}`,
-        },
-        body: JSON.stringify({
-          printerName: settings.printerName,
-          tsplData: sampleTspl,
-          copies: 1,
-        }),
+      const result = await sendToPrintAgent({
+        agentUrl: settings.agentUrl,
+        agentToken: settings.agentToken,
+        printerName: settings.printerName,
+        tsplData: sampleTspl,
+        copies: 1,
       });
-
-      const result = await response.json().catch(() => ({}));
-      if (response.ok && result.ok === true) {
+      if (result.ok) {
         setMessage({ type: "success", text: `Test label sent to ${settings.printerName} successfully!` });
       } else {
-        setMessage({ type: "error", text: result.error || "Failed to send test label to printer." });
+        setMessage({ type: "error", text: result.error });
       }
     } catch {
       setMessage({
         type: "error",
-        text: `Error connecting to Print Agent at ${settings.agentUrl}. Make sure 'npm run print-agent' is running on the local PC.`,
+        text: `Could not connect to Print Agent at ${settings.agentUrl}. Start it on the PC connected to the printer and allow local network access for this website in your browser.`,
       });
     }
     setLoading(false);
@@ -171,7 +154,7 @@ PRINT 1,1
               <p className="mt-0.5 text-amber-200/80">
                 To print directly to USB connected TVS LP 46 Dlite printer on Windows 11, run:
                 <code className="mx-1 rounded bg-black/40 px-1.5 py-0.5 font-mono text-amber-100">npm run print-agent</code>
-                or start <code className="font-mono">node src/print-agent/index.mjs</code>.
+                on the same PC, then select Allow if your browser asks to let this website access the local network or loopback devices. Confirm the configured URL is <code className="font-mono">http://127.0.0.1:9191</code>.
               </p>
             </div>
           </div>
@@ -274,6 +257,21 @@ PRINT 1,1
                 className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-cream focus:border-gold focus:outline-hidden"
               />
               <span className="text-[10px] text-cream/40">Speed in inches per second. Recommended: 4 ips</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-cream/70 mb-1">
+                Label Print Direction
+              </label>
+              <select
+                value={settings.orientation}
+                onChange={(e) => setSettings({ ...settings, orientation: Number(e.target.value) })}
+                className="w-full rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-cream focus:border-gold focus:outline-hidden"
+              >
+                <option value={1}>1 — Upright</option>
+                <option value={0}>0 — Reverse</option>
+              </select>
+              <span className="text-[10px] text-cream/40">Choose 1 if printed tag text appears upside down.</span>
             </div>
 
             <div>

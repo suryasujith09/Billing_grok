@@ -8,7 +8,9 @@ import {
   DEFAULT_TEMPLATES,
   generateTsplLabel,
   LEGACY_GOLD_DUAL_TEMPLATE_NAME,
+  SPLIT_BUTTERFLY_TAG_TEMPLATE,
   MONTEX_GOLD_81X12_TEMPLATE,
+  MONTEX_GOLD_SPLIT_81X12_TEMPLATE,
   type ItemPrintData,
   type LabelElement,
   type LabelTemplateConfig,
@@ -50,7 +52,7 @@ async function ensurePrinterSettings(shopId: string) {
         connectionType: "AGENT",
         density: 10,
         speed: 4,
-        orientation: 0,
+        orientation: 1,
         offsetX: 0,
         offsetY: 0,
         copies: 1,
@@ -222,6 +224,31 @@ export async function getLabelTemplates(shopId = "default") {
     });
   }
 
+  const splitButterflyTemplate = await prisma.labelTemplate.findUnique({
+    where: { id: SPLIT_BUTTERFLY_TAG_TEMPLATE.id },
+  });
+  if (splitButterflyTemplate && (
+    (splitButterflyTemplate.widthMm === 60 && splitButterflyTemplate.heightMm === 25) ||
+    splitButterflyTemplate.elements.includes('"id":"split-tag-id","fieldKey":"tagNo","xMm":40') ||
+    splitButterflyTemplate.elements.includes('"id":"split-tag-id","fieldKey":"tagNo","xMm":46')
+  )) {
+    await prisma.labelTemplate.update({
+      where: { id: SPLIT_BUTTERFLY_TAG_TEMPLATE.id },
+      data: {
+        name: SPLIT_BUTTERFLY_TAG_TEMPLATE.name,
+        widthMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.widthMm,
+        heightMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.heightMm,
+        columnsAcross: SPLIT_BUTTERFLY_TAG_TEMPLATE.columnsAcross ?? 1,
+        rollWidthMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.rollWidthMm ?? SPLIT_BUTTERFLY_TAG_TEMPLATE.widthMm,
+        colGapMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.colGapMm ?? 0,
+        leftWingWidthMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.leftWingWidthMm ?? 55,
+        rightWingWidthMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.rightWingWidthMm ?? 0,
+        tailWidthMm: SPLIT_BUTTERFLY_TAG_TEMPLATE.tailWidthMm ?? 26,
+        elements: JSON.stringify(SPLIT_BUTTERFLY_TAG_TEMPLATE.elements),
+      },
+    });
+  }
+
   const dbTemplates = await prisma.labelTemplate.findMany({
     where: { shopId },
     orderBy: { createdAt: "desc" },
@@ -246,7 +273,7 @@ export async function getLabelTemplates(shopId = "default") {
             rightWingWidthMm: tmpl.rightWingWidthMm ?? 28,
             tailWidthMm: tmpl.tailWidthMm ?? 4,
             elements: JSON.stringify(tmpl.elements),
-            isDefault: tmpl.id === MONTEX_GOLD_81X12_TEMPLATE.id,
+            isDefault: tmpl.id === SPLIT_BUTTERFLY_TAG_TEMPLATE.id,
           },
         })
       )
@@ -259,7 +286,84 @@ export async function getLabelTemplates(shopId = "default") {
     return seeded.map(repairLegacyPresetLayout);
   }
 
-  return dbTemplates.map(repairLegacyPresetLayout);
+  const savedTemplates = dbTemplates.map(repairLegacyPresetLayout);
+  const preferredPresetSaved = dbTemplates.find((saved) =>
+    saved.id === SPLIT_BUTTERFLY_TAG_TEMPLATE.id ||
+    saved.name === SPLIT_BUTTERFLY_TAG_TEMPLATE.name
+  );
+  const defaultTemplateId = dbTemplates.find((saved) => saved.isDefault)?.id ??
+    preferredPresetSaved?.id ?? dbTemplates[0]?.id;
+  const templatesWithPreferredDefault = savedTemplates.map((template) => ({
+    ...template,
+    isDefault: template.id === defaultTemplateId,
+  }));
+  const availablePresetTemplates = DEFAULT_TEMPLATES
+    .filter((preset) => !dbTemplates.some((saved) =>
+      saved.id === preset.id || saved.name === preset.name
+    ))
+    .map((preset) => ({
+      id: preset.id,
+      shopId,
+      name: preset.name,
+      category: preset.category,
+      widthMm: preset.widthMm,
+      heightMm: preset.heightMm,
+      gapMm: preset.gapMm,
+      columnsAcross: preset.columnsAcross ?? 1,
+      rollWidthMm: preset.rollWidthMm ?? preset.widthMm,
+      colGapMm: preset.colGapMm ?? 2,
+      leftWingWidthMm: preset.leftWingWidthMm ?? 28,
+      rightWingWidthMm: preset.rightWingWidthMm ?? 28,
+      tailWidthMm: preset.tailWidthMm ?? 4,
+      elements: JSON.stringify(preset.elements),
+      isDefault: preset.id === SPLIT_BUTTERFLY_TAG_TEMPLATE.id && !preferredPresetSaved,
+    }));
+
+  return [...templatesWithPreferredDefault, ...availablePresetTemplates];
+}
+
+export async function setDefaultLabelTemplateAction(templateId: string) {
+  const session = await getSession();
+  if (!session) return { ok: false as const, error: "Sign in before changing the default label." };
+
+  const shopId = "default";
+  const preset = DEFAULT_TEMPLATES.find((template) => template.id === templateId);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.labelTemplate.findUnique({ where: { id: templateId } });
+      if (!existing && !preset) throw new Error("Label template not found.");
+
+      if (!existing && preset) {
+        await tx.labelTemplate.create({
+          data: {
+            id: preset.id,
+            shopId,
+            name: preset.name,
+            category: preset.category,
+            widthMm: preset.widthMm,
+            heightMm: preset.heightMm,
+            gapMm: preset.gapMm,
+            columnsAcross: preset.columnsAcross ?? 1,
+            rollWidthMm: preset.rollWidthMm ?? preset.widthMm,
+            colGapMm: preset.colGapMm ?? 2,
+            leftWingWidthMm: preset.leftWingWidthMm ?? 28,
+            rightWingWidthMm: preset.rightWingWidthMm ?? 28,
+            tailWidthMm: preset.tailWidthMm ?? 4,
+            elements: JSON.stringify(preset.elements),
+            isDefault: false,
+          },
+        });
+      }
+
+      await tx.labelTemplate.updateMany({ where: { shopId }, data: { isDefault: false } });
+      await tx.labelTemplate.update({ where: { id: templateId }, data: { isDefault: true } });
+    });
+    revalidatePath("/inventory");
+    revalidatePath("/settings");
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Could not set the default label." };
+  }
 }
 
 export async function saveLabelTemplateAction(data: {
@@ -446,6 +550,7 @@ export async function printTagAction(opts: {
     grossWeight: num(ornament.grossWeight),
     netWeight: num(ornament.netWeight),
     stoneWeight: num(ornament.stoneWeight),
+    stoneCharge: num(ornament.stoneCharge),
     diamondCarat: num(ornament.diamondCarat),
     diamondPieces: ornament.diamondPieces,
     huid: ornament.huid,
@@ -517,6 +622,7 @@ export async function printTestLabelAction(template: LabelTemplateConfig) {
     grossWeight: 4.52,
     netWeight: 4.2,
     stoneWeight: 0.32,
+    stoneCharge: 5600,
     huid: "H12345",
     shopName: shop.name,
     productCode: "RG-001",

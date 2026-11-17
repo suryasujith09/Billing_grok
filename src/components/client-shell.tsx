@@ -24,7 +24,7 @@ export function ClientShell({
   const pathname = usePathname();
 
   // If on login route, render full screen without sidebar/board ticker
-  if (pathname.startsWith("/login")) {
+  if (["/", "/about", "/collections", "/services", "/contact"].includes(pathname) || pathname.startsWith("/login") || pathname === "/software/login") {
     return <>{children}</>;
   }
 

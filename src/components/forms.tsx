@@ -4,7 +4,6 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import {
-  CATEGORIES,
   INDIAN_STATES,
   MAKING_GST_MODES,
   MAKING_TYPES,
@@ -16,6 +15,8 @@ import {
 import {
   addPaymentAction,
   cancelInvoiceAction,
+  deleteInvoiceAction,
+  createInventoryCategoryAction,
   saveCustomerAction,
   saveOrnamentAction,
   saveRatesAction,
@@ -54,6 +55,7 @@ export function ShopForm({
     bankAccount: string;
     ifsc: string;
     invoicePrefix: string;
+    billOfSupplyPrefix: string;
     makingGstMode: string;
     terms: string;
   };
@@ -195,6 +197,9 @@ export function ShopForm({
         <Field label="Invoice prefix">
           <Input name="invoicePrefix" defaultValue={shop.invoicePrefix} />
         </Field>
+        <Field label="Bill of Supply prefix">
+          <Input name="billOfSupplyPrefix" defaultValue={shop.billOfSupplyPrefix} />
+        </Field>
         <Field label="GST on making">
           <Select name="makingGstMode" defaultValue={shop.makingGstMode}>
             {MAKING_GST_MODES.map((m) => (
@@ -235,9 +240,11 @@ export function RateForm({
     "GOLD:22K",
     "GOLD:18K",
     "GOLD:14K",
+    "SILVER:999.9",
     "SILVER:999",
     "SILVER:925",
     "PLATINUM:950",
+    "PEARLS:N/A",
   ];
   return (
     <form action={action} className="space-y-4" id="rates">
@@ -327,7 +334,11 @@ export function CustomerForm({
 
 export function OrnamentForm({
   item,
+  isAdmin = false,
+  categories,
 }: {
+  isAdmin?: boolean;
+  categories: string[];
   item?: {
     id: string;
     tagNo: string;
@@ -347,14 +358,44 @@ export function OrnamentForm({
     hallmarkCharge: number;
     otherCharge: number;
     costPrice: number | null;
+    mrp: number | null;
     notes: string;
+    isFullyOwned?: boolean;
   };
 }) {
   const router = useRouter();
   const [state, action] = useActionState(saveOrnamentAction, null);
+  const [categoryOptions, setCategoryOptions] = useState(categories);
+  const [selectedCategory, setSelectedCategory] = useState(item?.category ?? "RING");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   useEffect(() => {
-    if (state?.ok && state.id) router.push(`/inventory/${state.id}`);
+    if (state?.ok && state.id) router.replace("/inventory");
   }, [router, state]);
+
+  async function createCategory() {
+    setCategoryError(null);
+    setIsSavingCategory(true);
+    try {
+      const result = await createInventoryCategoryAction(newCategoryName);
+      if (!result.ok) {
+        setCategoryError(result.error);
+        return;
+      }
+      setCategoryOptions((current) => current.some((value) => value.toLowerCase() === result.category.toLowerCase())
+        ? current
+        : [...current, result.category]);
+      setSelectedCategory(result.category);
+      setNewCategoryName("");
+      setIsCreatingCategory(false);
+    } catch {
+      setCategoryError("Could not create category. Check your connection and try again.");
+    } finally {
+      setIsSavingCategory(false);
+    }
+  }
   return (
     <form action={action} className="space-y-4">
       {item ? <input type="hidden" name="id" value={item.id} /> : null}
@@ -371,15 +412,47 @@ export function OrnamentForm({
           <Input name="name" defaultValue={item?.name} required />
         </Field>
         <Field label="Category">
-          <Select name="category" defaultValue={item?.category ?? "RING"}>
-            {CATEGORIES.map((c) => (
+          <Select
+            name="category"
+            value={selectedCategory}
+            onChange={(event) => {
+              if (event.target.value === "__create_category__") {
+                setIsCreatingCategory(true);
+                setNewCategoryName("");
+                return;
+              }
+              setSelectedCategory(event.target.value);
+              setIsCreatingCategory(false);
+            }}
+          >
+            {categoryOptions.map((c) => (
               <option key={c} value={c}>
                 {labelize(c)}
               </option>
             ))}
+            <option value="__create_category__">+ Create a category…</option>
           </Select>
         </Field>
-        <Field label="Metal">
+        {isCreatingCategory ? (
+          <div className="md:col-span-3 flex flex-wrap items-end gap-2">
+            <Field label="New category name" className="min-w-56 flex-1">
+              <Input
+                value={newCategoryName}
+                maxLength={40}
+                placeholder="For example, Bridal Collection"
+                onChange={(event) => setNewCategoryName(event.target.value)}
+              />
+            </Field>
+            <Button type="button" variant="secondary" disabled={isSavingCategory || !newCategoryName.trim()} onClick={createCategory}>
+              {isSavingCategory ? "Creating…" : "Create category"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => { setIsCreatingCategory(false); setCategoryError(null); }}>
+              Cancel
+            </Button>
+            {categoryError ? <p className="w-full text-sm text-red-600" role="alert">{categoryError}</p> : null}
+          </div>
+        ) : null}
+        <Field label="Metal / Material">
           <Select name="metal" defaultValue={item?.metal ?? "GOLD"}>
             {METALS.map((m) => (
               <option key={m}>{m}</option>
@@ -435,6 +508,17 @@ export function OrnamentForm({
         <Field label="Cost price">
           <Input name="costPrice" type="number" step="0.01" defaultValue={item?.costPrice ?? ""} />
         </Field>
+        <Field label="Tag price (MRP ₹)">
+          <Input name="mrp" type="number" min="0" step="0.01" defaultValue={item?.mrp ?? ""} placeholder="For example, 42000" />
+        </Field>
+        {isAdmin ? (
+          <Field label="Ownership">
+            <Select name="isFullyOwned" defaultValue={String(item?.isFullyOwned ?? true)}>
+              <option value="true">Fully owned</option>
+              <option value="false">Not fully owned</option>
+            </Select>
+          </Field>
+        ) : null}
         <Field label="HSN">
           <Input name="hsn" defaultValue={item?.hsn ?? "7113"} />
         </Field>
@@ -465,6 +549,32 @@ export function CancelInvoiceButton({ id }: { id: string }) {
       disabled={pending}
     >
       {pending ? "Cancelling…" : "Cancel invoice"}
+    </Button>
+  );
+}
+
+export function DeleteInvoiceButton({ id, invoiceNo }: { id: string; invoiceNo: string }) {
+  const [pending, setPending] = useState(false);
+  const router = useRouter();
+  return (
+    <Button
+      type="button"
+      variant="danger"
+      size="sm"
+      onClick={async () => {
+        if (!confirm(`Permanently delete invoice ${invoiceNo}, including its items, exchanges, and payments? Tagged items will return to stock. This cannot be undone.`)) return;
+        setPending(true);
+        const result = await deleteInvoiceAction(id);
+        setPending(false);
+        if (!result.ok) alert(result.error);
+        else {
+          router.push("/invoices");
+          router.refresh();
+        }
+      }}
+      disabled={pending}
+    >
+      {pending ? "Deleting…" : "Delete invoice"}
     </Button>
   );
 }

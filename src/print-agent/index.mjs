@@ -8,6 +8,8 @@ const PORT = process.env.PRINT_AGENT_PORT || 9191;
 const TOKEN = process.env.PRINT_AGENT_TOKEN || "surya-print-secret-token";
 const ALLOWED_ORIGINS = new Set([
   "https://billing-grok.vercel.app",
+  "https://www.twinklestargd.com",
+  "https://twinklestargd.com",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   ...(process.env.PRINT_AGENT_ALLOWED_ORIGINS || "")

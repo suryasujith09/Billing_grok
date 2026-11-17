@@ -9,9 +9,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? headersList.get("x-invoke-path") ?? "";
 
-  // On the login page, skip heavy DB calls — no sidebar or board ticker needed
-  if (pathname.startsWith("/login")) {
-    return <ClientShell shopName="" ratesFormatted={[]} role="counter" username="">{children}</ClientShell>;
+  // Public pages and login do not need the private billing shell or database.
+  if (["/", "/about", "/collections", "/services", "/contact", "/login", "/software/login"].includes(pathname)) {
+    return children;
   }
 
   const [shop, rates, session] = await Promise.all([

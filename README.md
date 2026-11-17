@@ -1,4 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Twinklestar Gold & Diamonds website and billing
+
+This repository contains the existing jewellery billing application and the public Twinklestar Gold & Diamonds website. The public pages live at `/`, `/about`, `/collections`, `/services`, and `/contact`. Staff can enter the existing authentication flow from `/software/login`; authenticated billing routes and their session and role checks remain in place. The staff dashboard is at `/dashboard`.
+
+## Local development
+
+Install dependencies and configure the existing database and session variables from `.env.example` in `.env.local`. Then run:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The billing application still requires a configured PostgreSQL `DATABASE_URL` and `SESSION_SECRET`. No schema or migration changes are required for the public site.
+
+## Public contact details and enquiry delivery
+
+Add only company contact details approved for publication to `.env.local`:
+
+- `NEXT_PUBLIC_CONTACT_EMAIL`
+- `NEXT_PUBLIC_CONTACT_PHONE`
+- `NEXT_PUBLIC_BUSINESS_ADDRESS`
+
+The contact form sends enquiries through Resend from a server route. To enable delivery, configure `RESEND_API_KEY`, `CONTACT_FROM_EMAIL` (a sender verified with Resend), and `CONTACT_TO_EMAIL` (the approved company inbox). These values stay server-side. Until configured, the form reports that it is being set up. The endpoint validates input, checks the request origin, uses a honeypot, and applies basic per-process throttling; configure provider-side abuse controls for a multi-instance production deployment as well.
+
+## Deployment
+
+The repository is already configured for Vercel (`vercel.json`, existing `.vercel` project link). Deploy through that same Vercel project to preserve the current billing deployment and environment. Set the approved contact variables there, then verify the existing project has `twinklestargd.com` attached with valid SSL before directing production traffic. No DNS, database, hosting, or production environment changes were made here. The domain and production deployment have not been verified or changed by this work.
+
+The existing production database migrations are unchanged. Continue using the existing baseline and deployment procedure below if you separately deploy pending database migrations; the public website itself does not require one.
 
 ## Database setup
 

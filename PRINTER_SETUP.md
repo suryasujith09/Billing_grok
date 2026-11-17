@@ -34,9 +34,9 @@ npm run print-agent
 node src/print-agent/index.mjs
 ```
 
-The print agent will start listening on `http://127.0.0.1:9191`. Keep this process running while printing. In production, the site may ask your browser for permission to access the local network; allow it for `billing-grok.vercel.app`.
+The print agent will start listening on `http://127.0.0.1:9191`. Keep this process running while printing. The billing page and this agent must run on the same PC: `127.0.0.1` always means the computer running the browser. When Chrome or Edge asks, allow the billing site's local network or loopback access. If you previously blocked it, open the site's permissions/settings in the browser and allow local network access, then return to Printer Settings and press **Refresh**.
 
-If you use a different production domain, add it to `PRINT_AGENT_ALLOWED_ORIGINS` as a comma-separated list before starting the agent. The default allowed origins are the production billing site and local development at `localhost:3000` / `127.0.0.1:3000`.
+The agent allows `billing-grok.vercel.app`, `twinklestargd.com`, and `www.twinklestargd.com` by default, plus local development at `localhost:3000` / `127.0.0.1:3000`. If you use a different domain, add its exact origin (scheme and host, without a trailing slash) to `PRINT_AGENT_ALLOWED_ORIGINS`, separated by commas, before starting the agent.
 
 ### Step 2: Verify Agent Status
 Navigate to `/settings` -> **TVS LP 46 Dlite Printer Settings** in the billing application.
@@ -74,8 +74,8 @@ Follow this 13-step checklist before beginning production label printing:
 ## 4. Troubleshooting Guide
 
 ### Issue A: "Local Print Agent Offline" Banner
-- **Cause**: The local agent is stopped, is running on a different PC, or the browser has not allowed the billing site to access the local network.
-- **Solution**: On the PC connected to the printer, run `npm run print-agent`, allow local-network access for the billing site when prompted, and confirm the configured agent URL is `http://127.0.0.1:9191`.
+- **Cause**: The local agent is stopped, is running on a different PC from the browser, the website origin is not allowed, or the browser has blocked local network access.
+- **Solution**: On the PC connected to the printer and running the billing page, run `npm run print-agent`, allow local network/loopback access for the billing site in Chrome or Edge, and confirm the configured agent URL is `http://127.0.0.1:9191`. In Printer Settings, click **Refresh** to check the connection again.
 
 ### Issue B: Printer Skips Labels or Shifts Alignment
 - **Cause**: Media gap sensor needs calibration or gap size mismatch.

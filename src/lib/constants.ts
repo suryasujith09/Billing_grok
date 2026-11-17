@@ -11,17 +11,21 @@ export const CATEGORIES = [
   "SET",
   "COIN",
   "OTHER",
+  "ARTICLES",
 ] as const;
 
-export const METALS = ["GOLD", "SILVER", "PLATINUM"] as const;
+export const METALS = ["GOLD", "SILVER", "PLATINUM", "DIAMOND", "PEARLS", "GOLD_PLATED"] as const;
 
 export const PURITIES: Record<string, string[]> = {
   GOLD: ["24K", "22K", "18K", "14K"],
-  SILVER: ["999", "925"],
+  SILVER: ["999.9", "999", "925"],
   PLATINUM: ["950", "900"],
+  DIAMOND: ["N/A"],
+  PEARLS: ["N/A"],
+  GOLD_PLATED: ["N/A"],
 };
 
-export const ALL_PURITIES = ["24K", "22K", "18K", "14K", "999", "925", "950", "900"];
+export const ALL_PURITIES = ["24K", "22K", "18K", "14K", "999.9", "999", "925", "950", "900", "N/A"];
 
 export const MAKING_TYPES = [
   { value: "PER_GRAM", label: "Per gram" },

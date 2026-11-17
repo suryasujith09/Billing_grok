@@ -65,7 +65,7 @@ export async function loginAction(
   }
 
   await createSession(role, displayName, identity);
-  redirect("/");
+  redirect("/dashboard");
 }
 
 export async function logoutAction(): Promise<never> {
@@ -80,5 +80,5 @@ export async function logoutAction(): Promise<never> {
     } });
   }
   await deleteSession();
-  redirect("/login");
+  redirect("/");
 }

@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { endOfDay, num, startOfDay } from "./money";
 import { cache } from "react";
+import { CATEGORIES } from "./constants";
 
 export const getShop = cache(async function getShop() {
   const shop = await prisma.shop.findUnique({ where: { id: "default" } });
@@ -25,6 +26,8 @@ export const getShop = cache(async function getShop() {
       ifsc: "",
       invoicePrefix: "SGD",
       nextInvoiceNo: 1,
+      billOfSupplyPrefix: "BOS",
+      nextBillOfSupplyNo: 1,
       makingGstMode: "SEPARATE_5",
       terms: "",
     };
@@ -93,6 +96,7 @@ export async function listOrnaments(opts?: {
   status?: string;
   category?: string;
   page?: number;
+  sort?: "newest" | "oldest";
 }) {
   const q = opts?.q?.trim();
   const where = {
@@ -102,6 +106,7 @@ export async function listOrnaments(opts?: {
         ? {
             OR: [
               { tagNo: { contains: q } },
+              { productCode: { contains: q } },
               { name: { contains: q } },
               { huid: { contains: q } },
             ],
@@ -112,7 +117,12 @@ export async function listOrnaments(opts?: {
   const [items, count, weights] = await Promise.all([
     prisma.ornament.findMany({
       where,
-      orderBy: [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+      orderBy: [
+        { status: "asc" },
+        { createdAt: opts?.sort === "oldest" ? "asc" : "desc" },
+        { tagNo: "asc" },
+        { id: "asc" },
+      ],
       take: pageSize,
       skip: ((opts?.page ?? 1) - 1) * pageSize,
     }),
@@ -128,15 +138,29 @@ export async function listOrnaments(opts?: {
   };
 }
 
+export async function getInventoryCategories() {
+  const [saved, existing] = await Promise.all([
+    prisma.inventoryCategory.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
+    prisma.ornament.findMany({ select: { category: true }, distinct: ["category"], orderBy: { category: "asc" } }),
+  ]);
+  const byKey = new Map<string, string>();
+  for (const name of [...CATEGORIES, ...saved.map((row) => row.name), ...existing.map((row) => row.category)]) {
+    const trimmed = name.trim();
+    if (trimmed) byKey.set(trimmed.toLocaleLowerCase(), trimmed);
+  }
+  return [...byKey.values()];
+}
+
 export async function getOrnamentByTag(tagNo: string) {
   return prisma.ornament.findUnique({
     where: { tagNo: tagNo.trim().toUpperCase() },
   });
 }
 
-export async function listInvoices(opts?: { q?: string; from?: Date; to?: Date; page?: number }) {
+export async function listInvoices(opts?: { q?: string; from?: Date; to?: Date; page?: number; invoiceType?: "GST" | "BILL_OF_SUPPLY" }) {
   const q = opts?.q?.trim();
   const where = {
+      ...(opts?.invoiceType ? { invoiceType: opts.invoiceType } : {}),
       ...(opts?.from || opts?.to
         ? {
             date: {

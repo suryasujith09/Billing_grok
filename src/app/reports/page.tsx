@@ -3,7 +3,7 @@ import { reportForRange } from "@/lib/queries";
 import { formatDate, grams, inr, num, todayISO } from "@/lib/money";
 import { labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Stat } from "@/components/ui";
-import { Calendar, Filter, PieChart, ShoppingBag } from "lucide-react";
+import { Calendar, Download, Filter, PieChart, ShoppingBag } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { connection } from "next/server";
 
@@ -21,6 +21,10 @@ export default async function ReportsPage({
   const to = params.to ? new Date(params.to) : now;
 
   const report = await reportForRange(from, to);
+  const fromDate = todayISO(from);
+  const toDate = todayISO(to);
+  const salesExport = `/api/reports/export?type=sales&from=${fromDate}&to=${toDate}`;
+  const stockExport = "/api/reports/export?type=inventory";
   const invoiceWhere = { status: "FINAL", date: { gte: from, lte: to } };
   const [staffSales, counterSales] = await Promise.all([
     prisma.invoice.groupBy({ by: ["employeeCode", "billerName"], where: invoiceWhere, _count: { _all: true }, _sum: { grandTotal: true, oldGoldValue: true } }),
@@ -63,6 +67,20 @@ export default async function ReportsPage({
             </span>
           </div>
         </form>
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-sand pt-4">
+          <Link href={salesExport} className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md border border-royal bg-royal px-4 py-2 text-sm font-medium text-cream transition hover:bg-royal-deep">
+            <Download size={16} />
+            Download sales CSV
+          </Link>
+          <Link href={`/api/reports/export?type=sales&from=${todayISO()}&to=${todayISO()}`} className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md border border-sand bg-transparent px-4 py-2 text-sm font-medium text-ink transition hover:bg-sand/60">
+            <Download size={16} />
+            Download today’s sales
+          </Link>
+          <Link href={stockExport} className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md border border-sand bg-transparent px-4 py-2 text-sm font-medium text-ink transition hover:bg-sand/60">
+            <Download size={16} />
+            Download stock CSV
+          </Link>
+        </div>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">

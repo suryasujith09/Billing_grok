@@ -41,15 +41,20 @@
   }
 
   .readablePrint :global(.sg-items th:nth-child(2)) {
-    width: 24% !important;
+    width: 22% !important;
   }
 
-  .readablePrint :global(.sg-items th:nth-child(9)) {
-    width: 8% !important;
+  .readablePrint :global(.sg-items th:nth-child(3)) {
+    width: 9% !important;
   }
 
+  .readablePrint :global(.sg-items th:nth-child(9)),
   .readablePrint :global(.sg-items th:nth-child(10)) {
-    width: 14% !important;
+    width: 7% !important;
+  }
+
+  .readablePrint :global(.sg-items th:nth-child(11)) {
+    width: 11% !important;
   }
 
   .readablePrint :global(.sg-lower) {

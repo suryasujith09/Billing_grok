@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getInvoice, getShop } from "@/lib/queries";
 import { inr, num } from "@/lib/money";
 import { InvoiceThemeSwitcher } from "@/components/invoice-theme-switcher";
-import { CancelInvoiceButton, CollectPaymentForm } from "@/components/forms";
+import { CancelInvoiceButton, CollectPaymentForm, DeleteInvoiceButton } from "@/components/forms";
 import { Card } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/session";
@@ -32,7 +32,7 @@ export default async function InvoiceDetailPage({
       {/* Top Bar for Screen only */}
       <div className="no-print space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/invoices" className="inline-flex items-center gap-1 text-xs font-semibold text-stone hover:text-ink">
+          <Link href={invoice.invoiceType === "BILL_OF_SUPPLY" ? "/non-gst-invoices" : "/invoices"} className="inline-flex items-center gap-1 text-xs font-semibold text-stone hover:text-ink">
             <ArrowLeft size={14} />
             Back to invoices
           </Link>
@@ -42,6 +42,7 @@ export default async function InvoiceDetailPage({
                 Edit invoice
               </Link>
             ) : null}
+            {session?.role === "admin" ? <DeleteInvoiceButton id={invoice.id} invoiceNo={invoice.invoiceNo} /> : null}
             {invoice.status === "FINAL" && balance > 0 ? (
               <div className="flex items-center gap-2 border border-amber-300 bg-amber-50 px-3 py-1.5 rounded-md text-xs">
                 <span className="font-semibold text-amber-900">

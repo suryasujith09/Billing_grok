@@ -22,9 +22,10 @@ import { logoutAction } from "@/lib/auth-actions";
 import type { Role } from "@/lib/session";
 
 const ALL_NAV = [
-  { href: "/", label: "Home", icon: LayoutDashboard, adminOnly: false },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard, adminOnly: false },
   { href: "/billing", label: "New Bill", icon: Receipt, adminOnly: false },
   { href: "/invoices", label: "Invoices", icon: BookOpen, adminOnly: false },
+  { href: "/non-gst-invoices", label: "Bills of Supply", icon: Receipt, adminOnly: false },
   { href: "/inventory", label: "Stock", icon: Gem, adminOnly: false },
   { href: "/customers", label: "Customers", icon: Users, adminOnly: false },
   { href: "/attendance", label: "Attendance", icon: CalendarCheck, adminOnly: false },
@@ -51,8 +52,8 @@ function NavLinks({
     <>
       {nav.map((item) => {
         const active =
-          item.href === "/"
-            ? pathname === "/"
+          item.href === "/dashboard"
+            ? pathname === "/dashboard"
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
         const Icon = item.icon;
         return (

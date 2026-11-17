@@ -14,7 +14,7 @@ export function SettingsTabs({
   printerSettingsView,
   labelDesignerView,
 }: SettingsTabsProps) {
-  const [activeTab, setActiveTab] = useState<"profile" | "printer" | "designer">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "printer" | "designer">("designer");
 
   return (
     <div className="space-y-6">

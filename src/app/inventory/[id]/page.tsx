@@ -1,10 +1,12 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { num } from "@/lib/money";
 import { OrnamentForm } from "@/components/forms";
 import { Card, PageHeader } from "@/components/ui";
 import { ArrowLeft } from "lucide-react";
+import { getSession } from "@/lib/session";
+import { getInventoryCategories } from "@/lib/queries";
 
 export default async function EditOrnamentPage({
   params,
@@ -12,7 +14,14 @@ export default async function EditOrnamentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const ornament = await prisma.ornament.findUnique({ where: { id } });
+  const [session, ornament, categories] = await Promise.all([
+    getSession(),
+    prisma.ornament.findUnique({ where: { id } }),
+    getInventoryCategories(),
+  ]);
+
+  if (!session) redirect("/login");
+  if (session.role !== "admin") redirect("/inventory");
 
   if (!ornament) {
     notFound();
@@ -45,7 +54,7 @@ export default async function EditOrnamentPage({
         subtitle="Update ornament attributes, weight measurements, or making rates."
       />
       <Card>
-        <OrnamentForm item={formattedItem} />
+        <OrnamentForm item={formattedItem} isAdmin={session?.role === "admin"} categories={categories} />
       </Card>
     </div>
   );

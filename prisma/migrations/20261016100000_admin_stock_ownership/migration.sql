@@ -1,0 +1,2 @@
+ALTER TABLE "Ornament"
+ADD COLUMN "isFullyOwned" BOOLEAN NOT NULL DEFAULT true;

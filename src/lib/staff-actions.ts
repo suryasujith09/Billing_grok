@@ -39,6 +39,37 @@ export async function createEmployeeAction(formData: FormData) {
   revalidatePath("/employees");
 }
 
+export type StaffSaveState = { saved?: boolean; error?: string };
+
+export async function updateEmployeeAction(_previous: StaffSaveState, formData: FormData): Promise<StaffSaveState> {
+ try {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const employeeCode = String(formData.get("employeeCode") ?? "").trim().toUpperCase();
+  const username = String(formData.get("username") ?? "").trim().toLowerCase();
+  const role = String(formData.get("role") ?? "");
+  if (!id || !name || !/^[A-Z0-9-]{2,24}$/.test(employeeCode) || !/^[a-z0-9._-]{3,40}$/.test(username) || !["admin", "manager", "counter"].includes(role)) {
+    throw new Error("Enter valid employee details and choose an available role.");
+  }
+  const joiningDate = String(formData.get("dateOfJoining") ?? "");
+  const employee = await prisma.employee.update({ where: { id }, data: {
+    name, employeeCode, username, role,
+    mobile: String(formData.get("mobile") ?? "").trim(),
+    email: String(formData.get("email") ?? "").trim(),
+    designation: String(formData.get("designation") ?? "").trim(),
+    department: String(formData.get("department") ?? "").trim(),
+    dateOfJoining: joiningDate ? new Date(`${joiningDate}T00:00:00.000Z`) : undefined,
+  } });
+  await prisma.employeeActivity.create({ data: { employeeId: id, employeeCode, employeeName: name, action: "EMPLOYEE_DETAILS_UPDATED", newValue: `Role: ${role}` } });
+  revalidatePath("/employees");
+  revalidatePath("/attendance");
+  return { saved: true };
+ } catch (error) {
+  return { error: error instanceof Error ? error.message : "Unable to save employee details." };
+ }
+}
+
 export async function createCounterAction(formData: FormData) {
   await requireAdmin();
   const number = String(formData.get("number") ?? "").trim().toUpperCase();
@@ -46,7 +77,11 @@ export async function createCounterAction(formData: FormData) {
   const employeeId = String(formData.get("employeeId") ?? "").trim() || null;
   if (!number || !name) throw new Error("Counter number and name are required.");
   await prisma.$transaction(async (tx) => {
-    if (employeeId) await tx.counter.updateMany({ where: { employeeId }, data: { employeeId: null } });
+    if (employeeId) {
+      const employee = await tx.employee.findFirst({ where: { id: employeeId, status: "ACTIVE" } });
+      if (!employee) throw new Error("Choose an active employee for this counter.");
+      await tx.counter.updateMany({ where: { employeeId }, data: { employeeId: null } });
+    }
     await tx.counter.create({ data: { number, name, location: String(formData.get("location") ?? "").trim(), employeeId } });
   });
   revalidatePath("/employees");
@@ -57,10 +92,29 @@ export async function assignCounterAction(formData: FormData) {
   const counterId = String(formData.get("counterId") ?? "");
   const employeeId = String(formData.get("employeeId") ?? "") || null;
   await prisma.$transaction(async (tx) => {
-    if (employeeId) await tx.counter.updateMany({ where: { employeeId, id: { not: counterId } }, data: { employeeId: null } });
+    if (employeeId) {
+      const employee = await tx.employee.findFirst({ where: { id: employeeId, status: "ACTIVE" } });
+      if (!employee) throw new Error("Choose an active employee for this counter.");
+      await tx.counter.updateMany({ where: { employeeId, id: { not: counterId } }, data: { employeeId: null } });
+    }
     await tx.counter.update({ where: { id: counterId }, data: { employeeId } });
   });
   revalidatePath("/employees");
+}
+
+export async function updateCounterAction(_previous: StaffSaveState, formData: FormData): Promise<StaffSaveState> {
+ try {
+  await requireAdmin();
+  const counterId = String(formData.get("counterId") ?? "");
+  const number = String(formData.get("number") ?? "").trim().toUpperCase();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!counterId || !number || !name) throw new Error("Counter number and name are required.");
+  await prisma.counter.update({ where: { id: counterId }, data: { number, name, location: String(formData.get("location") ?? "").trim() } });
+  revalidatePath("/employees");
+  return { saved: true };
+ } catch (error) {
+  return { error: error instanceof Error ? error.message : "Unable to save counter details." };
+ }
 }
 
 export async function setEmployeeStatusAction(formData: FormData) {
@@ -71,6 +125,7 @@ export async function setEmployeeStatusAction(formData: FormData) {
   const employee = await prisma.employee.update({ where: { id }, data: { status } });
   await prisma.employeeActivity.create({ data: { employeeId: id, employeeCode: employee.employeeCode, employeeName: employee.name, action: "EMPLOYEE_STATUS_CHANGED", newValue: status } });
   revalidatePath("/employees");
+  revalidatePath("/attendance");
 }
 
 export async function saveEmployeeSignatureAction(formData: FormData) {

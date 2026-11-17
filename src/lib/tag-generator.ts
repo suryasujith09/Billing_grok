@@ -51,13 +51,28 @@ export async function generateUniqueTagId(opts?: {
   const year = new Date().getFullYear() % 100; // e.g. 26 for 2026
 
   const fullPrefix = `${prefix}${year}${catCode}`;
+  const sequenceKey = `${prefix}${year}SEQ`;
+  const tagBase = `${prefix}${year}`;
 
   return await prisma.$transaction(async (tx) => {
+    const [sequences, ornaments, invoiceItems, printLogs] = await Promise.all([
+      tx.tagSequence.findMany({ where: { shopId, year, prefix: { startsWith: tagBase } }, select: { nextVal: true } }),
+      tx.ornament.findMany({ where: { tagNo: { startsWith: tagBase } }, select: { tagNo: true } }),
+      tx.invoiceItem.findMany({ where: { tagNo: { startsWith: tagBase } }, select: { tagNo: true } }),
+      tx.printLog.findMany({ where: { shopId, tagNo: { startsWith: tagBase } }, select: { tagNo: true } }),
+    ]);
+    const knownSuffixes = [
+      ...sequences.map((sequence) => sequence.nextVal - 1),
+      ...ornaments.map(({ tagNo }) => Number(tagNo.match(/(\d+)$/)?.[1] ?? 0)),
+      ...invoiceItems.map(({ tagNo }) => Number(tagNo.match(/(\d+)$/)?.[1] ?? 0)),
+      ...printLogs.map(({ tagNo }) => Number(tagNo.match(/(\d+)$/)?.[1] ?? 0)),
+    ];
+    const nextNewSequence = Math.max(0, ...knownSuffixes) + 2;
     const seq = await tx.tagSequence.upsert({
       where: {
         shopId_prefix_year: {
           shopId,
-          prefix: fullPrefix,
+          prefix: sequenceKey,
           year,
         },
       },
@@ -66,9 +81,9 @@ export async function generateUniqueTagId(opts?: {
       },
       create: {
         shopId,
-        prefix: fullPrefix,
+        prefix: sequenceKey,
         year,
-        nextVal: 2, // First one will be 1
+        nextVal: nextNewSequence,
       },
     });
 

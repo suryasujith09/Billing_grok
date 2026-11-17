@@ -4,6 +4,8 @@ import { formatDate, inr, num } from "@/lib/money";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
 import { Plus, Receipt, Search } from "lucide-react";
 import { connection } from "next/server";
+import { getSession } from "@/lib/session";
+import { DeleteInvoiceButton } from "@/components/forms";
 
 export default async function InvoicesPage({
   searchParams,
@@ -17,7 +19,10 @@ export default async function InvoicesPage({
   const toDate = params.to ? new Date(params.to) : undefined;
 
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
-  const result = await listInvoices({ q, from: fromDate, to: toDate, page });
+  const [result, session] = await Promise.all([
+    listInvoices({ q, from: fromDate, to: toDate, page, invoiceType: "GST" }),
+    getSession(),
+  ]);
   const invoices = result.items;
 
   const totalNet = result.totals.net;
@@ -166,12 +171,15 @@ export default async function InvoicesPage({
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                      <span className="inline-flex items-center justify-end gap-3">
                       <Link
                         href={`/invoices/${inv.id}`}
                         className="text-xs font-semibold text-royal hover:underline"
                       >
                         View & Print
                       </Link>
+                      {session?.role === "admin" ? <DeleteInvoiceButton id={inv.id} invoiceNo={inv.invoiceNo} /> : null}
+                      </span>
                     </td>
                   </tr>
                 ))}

@@ -27,6 +27,8 @@ type InvoiceDoc = {
   sgst5: unknown;
   roundOff: unknown;
   grandTotal: unknown;
+  discountPercent?: unknown;
+  discountAmount?: unknown;
   oldGoldValue: unknown;
   netPayable: unknown;
   paidAmount: unknown;
@@ -50,6 +52,8 @@ type InvoiceDoc = {
     hallmarkCharge: unknown;
     otherCharge?: unknown;
     lineTotal: unknown;
+    discountPercent?: unknown;
+    discountAmount?: unknown;
   }>;
   exchanges: Array<{
     description: string;
@@ -655,6 +659,11 @@ export function InvoiceDocument({
                           </span>
                         ) : null}
                       </p>
+                      {num(item.discountAmount) > 0 ? (
+                        <p className="text-[9px] mt-0.5 leading-tight" style={{ color: "#4a1518" }}>
+                          Item discount {num(item.discountPercent)}% (− {inr(num(item.discountAmount))})
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-2 py-1.5 text-center align-top font-bold" style={{ color: "#1c110c" }}>
                       {item.purity}
@@ -985,6 +994,10 @@ export function InvoiceDocument({
                 <Row label="• SGST @ 2.5%" value={inr(num(invoice.sgst5))} muted indent />
               </>
             )}
+
+            {num(invoice.discountAmount) > 0 ? (
+              <Row label={`Bill discount${num(invoice.discountPercent) > 0 ? ` (${num(invoice.discountPercent)}%)` : ""}`} value={`− ${inr(num(invoice.discountAmount))}`} muted />
+            ) : null}
 
             {num(invoice.roundOff) !== 0 && (
               <Row label="Round Off Adjustment" value={inr(num(invoice.roundOff))} muted />

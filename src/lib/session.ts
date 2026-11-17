@@ -34,7 +34,9 @@ export async function decrypt(token: string | undefined): Promise<SessionPayload
     const { payload } = await jwtVerify(token, encodedKey, {
       algorithms: ["HS256"],
     });
-    return payload as unknown as SessionPayload;
+    const role = String(payload.role ?? "").toLowerCase();
+    if (!["admin", "manager", "counter"].includes(role)) return null;
+    return { ...payload, role } as unknown as SessionPayload;
   } catch {
     return null;
   }

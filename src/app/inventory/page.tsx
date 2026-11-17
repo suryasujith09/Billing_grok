@@ -1,27 +1,32 @@
 import Link from "next/link";
-import { listOrnaments } from "@/lib/queries";
+import { getInventoryCategories, listOrnaments } from "@/lib/queries";
 import { grams, num } from "@/lib/money";
-import { CATEGORIES, labelize } from "@/lib/constants";
+import { labelize } from "@/lib/constants";
 import { Button, Card, Field, Input, PageHeader, Select } from "@/components/ui";
 import { Plus, Search } from "lucide-react";
 import { InventoryTagActions } from "@/components/inventory-tag-actions";
 import { getLabelTemplates } from "@/lib/printer-actions";
 import type { LabelTemplateConfig } from "@/lib/tspl-engine";
+import { getSession } from "@/lib/session";
 
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; status?: string; sort?: string; page?: string }>;
 }) {
   const params = await searchParams;
+  const session = await getSession();
+  const isAdmin = session?.role === "admin";
   const q = params.q ?? "";
   const category = params.category ?? "";
   const status = params.status ?? "IN_STOCK";
+  const sort = params.sort === "oldest" ? "oldest" : "newest";
   const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
 
-  const [result, savedTemplates] = await Promise.all([
-    listOrnaments({ q, category, status: status || undefined, page }),
+  const [result, savedTemplates, categories] = await Promise.all([
+    listOrnaments({ q, category, status: status || undefined, page, sort }),
     getLabelTemplates(),
+    getInventoryCategories(),
   ]);
   const ornaments = result.items;
 
@@ -45,6 +50,7 @@ export default async function InventoryPage({
     mrp: item.mrp != null ? num(item.mrp) : null,
     printCount: item.printCount ?? 0,
     lastPrintedAt: item.lastPrintedAt,
+    ...(isAdmin ? { isFullyOwned: item.isFullyOwned } : {}),
   }));
   const templates: LabelTemplateConfig[] = savedTemplates.map((template) => ({
     id: template.id,
@@ -67,6 +73,7 @@ export default async function InventoryPage({
     if (q) query.set("q", q);
     if (category) query.set("category", category);
     if (status) query.set("status", status);
+    if (sort !== "newest") query.set("sort", sort);
     query.set("page", String(nextPage));
     return `/inventory?${query.toString()}`;
   };
@@ -99,7 +106,7 @@ export default async function InventoryPage({
             <Field label="Category">
               <Select name="category" defaultValue={category}>
                 <option value="">All Categories</option>
-                {CATEGORIES.map((c) => (
+                {categories.map((c) => (
                   <option key={c} value={c}>
                     {labelize(c)}
                   </option>
@@ -116,12 +123,20 @@ export default async function InventoryPage({
               </Select>
             </Field>
           </div>
+          <div className="w-full sm:w-44">
+            <Field label="Sort by">
+              <Select name="sort" defaultValue={sort}>
+                <option value="newest">Newly added first</option>
+                <option value="oldest">Oldest added first</option>
+              </Select>
+            </Field>
+          </div>
           <div className="flex w-full sm:w-auto items-center gap-2">
             <Button type="submit" variant="secondary" className="flex-1 sm:flex-none">
               <Search size={16} />
               Filter
             </Button>
-            {q || category || status !== "IN_STOCK" ? (
+            {q || category || status !== "IN_STOCK" || sort !== "newest" ? (
               <Link href="/inventory" className="flex-1 sm:flex-none">
                 <Button type="button" variant="ghost" className="w-full">
                   Reset
@@ -153,6 +168,7 @@ export default async function InventoryPage({
         items={mappedItems}
         templates={templates}
         defaultTemplateId={savedTemplates.find((template) => template.isDefault)?.id ?? ""}
+        isAdmin={isAdmin}
       />
       {result.count > 0 ? (
         <div className="flex items-center justify-between gap-3 text-xs text-stone">

@@ -26,6 +26,8 @@ model Shop {
   ifsc          String @default("")
   invoicePrefix String @default("SGD")
   nextInvoiceNo Int    @default(1)
+  billOfSupplyPrefix String @default("BOS")
+  nextBillOfSupplyNo Int   @default(1)
   makingGstMode String @default("SEPARATE_5")
   terms         String @default("")
 }
@@ -36,6 +38,13 @@ model MetalRate {
   purity        String
   ratePerGram   Decimal
   effectiveFrom DateTime @default(now())
+}
+
+model InventoryCategory {
+  id             String   @id @default(cuid())
+  name           String
+  normalizedName String   @unique
+  createdAt      DateTime @default(now())
 }
 
 model Customer {
@@ -86,6 +95,7 @@ model Ornament {
   diamondPieces   Int           @default(0)
   mrp             Decimal?
   supplier        String        @default("")
+  isFullyOwned    Boolean       @default(true)
   labelTemplateId String?
   lastPrintedAt   DateTime?
   printCount      Int           @default(0)
@@ -97,6 +107,8 @@ model Ornament {
 model Invoice {
   id                String                 @id @default(cuid())
   invoiceNo         String                 @unique
+  invoiceType       String                 @default("GST")
+  billOfSupplyReason String                @default("")
   date              DateTime               @default(now())
   customerId        String?
   customer          Customer?              @relation(fields: [customerId], references: [id])
@@ -121,6 +133,10 @@ model Invoice {
   sgst5             Decimal                @default(0)
   roundOff          Decimal                @default(0)
   grandTotal        Decimal                @default(0)
+  mrpTotal          Decimal                @default(0)
+  discountPercent   Decimal                @default(0)
+  discountAmount    Decimal                @default(0)
+  discountMode      String                 @default("PERCENT")
   oldGoldValue      Decimal                @default(0)
   netPayable        Decimal                @default(0)
   paidAmount        Decimal                @default(0)
@@ -145,6 +161,7 @@ model Invoice {
   @@index([customerId])
   @@index([employeeId, date])
   @@index([counterId, date])
+  @@index([invoiceType, date])
 }
 
 model Employee {
@@ -357,6 +374,11 @@ model InvoiceItem {
   stoneCharge    Decimal   @default(0)
   hallmarkCharge Decimal   @default(0)
   otherCharge    Decimal   @default(0)
+  pricingMode    String    @default("CALCULATED")
+  finalPrice     Decimal?
+  discountPercent Decimal   @default(0)
+  discountAmount  Decimal   @default(0)
+  discountMode    String    @default("PERCENT")
   taxable3       Decimal
   taxable5       Decimal
   lineTotal      Decimal

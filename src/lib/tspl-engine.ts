@@ -22,6 +22,7 @@ export interface LabelElement {
     | "grossWeight"
     | "netWeight"
     | "stoneWeight"
+    | "stoneCost"
     | "diamondCarat"
     | "huid"
     | "mrp"
@@ -63,6 +64,7 @@ export interface ItemPrintData {
   grossWeight: number;
   netWeight: number;
   stoneWeight: number;
+  stoneCharge?: number;
   diamondCarat?: number;
   diamondPieces?: number;
   huid?: string;
@@ -100,6 +102,52 @@ export const MONTEX_GOLD_81X12_TEMPLATE: LabelTemplateConfig = {
     { id: "montex-purity", fieldKey: "purity", xMm: 31, yMm: 7.4, fontSize: 1, isVisible: true, rotation: 0 },
     { id: "montex-gross", fieldKey: "grossWeight", xMm: 2, yMm: 9.6, fontSize: 1, isVisible: true, rotation: 0 },
     { id: "montex-net", fieldKey: "netWeight", xMm: 31, yMm: 9.6, fontSize: 1, isVisible: true, rotation: 0 },
+  ],
+};
+
+/** Compact split layout for Montex 81×12 mm tags: scan code on the left, item data on the printable right. */
+export const MONTEX_GOLD_SPLIT_81X12_TEMPLATE: LabelTemplateConfig = {
+  id: "preset-montex-split-81x12-v1",
+  name: "Montex 81×12 mm Split Tag (Barcode Left)",
+  category: "GOLD",
+  widthMm: 81,
+  heightMm: 12,
+  gapMm: 3,
+  columnsAcross: 1,
+  rollWidthMm: 81,
+  colGapMm: 0,
+  leftWingWidthMm: 0,
+  rightWingWidthMm: 0,
+  tailWidthMm: 26,
+  elements: [
+    { id: "split-barcode", fieldKey: "barcode", xMm: 2, yMm: 2, widthMm: 35, heightMm: 8, isVisible: true, rotation: 0 },
+    { id: "split-tag", fieldKey: "tagNo", xMm: 39, yMm: 0.4, fontSize: 1, fontStyle: "bold", isVisible: true, rotation: 0 },
+    { id: "split-purity", fieldKey: "purity", xMm: 39, yMm: 3, fontSize: 1, isVisible: true, rotation: 0 },
+    { id: "split-gross", fieldKey: "grossWeight", xMm: 39, yMm: 5.7, fontSize: 1, isVisible: true, rotation: 0 },
+    { id: "split-net", fieldKey: "netWeight", xMm: 39, yMm: 8.4, fontSize: 1, isVisible: true, rotation: 0 },
+  ],
+};
+
+/** Half barcode / half item details layout matching the shop's butterfly tag stock. */
+export const SPLIT_BUTTERFLY_TAG_TEMPLATE: LabelTemplateConfig = {
+  id: "preset-split-butterfly-60x25-v1",
+  name: "Split Jewellery Tag (81×12 mm, Barcode + MRP)",
+  category: "GENERAL",
+  widthMm: 81,
+  heightMm: 12,
+  gapMm: 3,
+  columnsAcross: 1,
+  rollWidthMm: 81,
+  colGapMm: 0,
+  leftWingWidthMm: 55,
+  rightWingWidthMm: 0,
+  tailWidthMm: 26,
+  elements: [
+    { id: "split-tag-barcode", fieldKey: "barcode", xMm: 2, yMm: 0.5, widthMm: 24, heightMm: 7, isVisible: true, rotation: 0 },
+    { id: "split-tag-id", fieldKey: "tagNo", xMm: 26, yMm: 0.4, fontSize: 1, fontStyle: "bold", isVisible: true, rotation: 0 },
+    { id: "split-tag-metal-purity", fieldKey: "purity", xMm: 26, yMm: 2.8, fontSize: 1, fontStyle: "bold", isVisible: true, rotation: 0 },
+    { id: "split-tag-mrp", fieldKey: "mrp", xMm: 26, yMm: 5.1, fontSize: 1, fontStyle: "bold", isVisible: true, rotation: 0 },
+    { id: "split-tag-description", fieldKey: "name", xMm: 26, yMm: 7.7, fontSize: 1, isVisible: true, rotation: 0 },
   ],
 };
 
@@ -199,6 +247,8 @@ export const DEFAULT_TEMPLATES: LabelTemplateConfig[] = [
     ],
   },
   MONTEX_GOLD_81X12_TEMPLATE,
+  MONTEX_GOLD_SPLIT_81X12_TEMPLATE,
+  SPLIT_BUTTERFLY_TAG_TEMPLATE,
 ];
 
 /**
@@ -214,18 +264,26 @@ export function formatFieldValue(
       return customText || item.shopName || "SURYA GOLD";
     case "tagNo":
       return item.tagNo;
-    case "name":
-      return item.name;
+    case "name": {
+      const oneLine = item.name.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+      return oneLine.length > 18 ? `${oneLine.slice(0, 15)}...` : oneLine;
+    }
     case "category":
       return item.category;
     case "purity":
-      return `${item.metal} ${item.purity}`;
+      return item.metal === "DIAMOND"
+        ? `DIAMOND${item.diamondCarat && item.diamondCarat > 0 ? ` ${item.diamondCarat.toFixed(2)}ct` : item.purity ? ` ${item.purity}` : ""}`
+        : `${item.metal}${item.purity ? ` ${item.purity}` : ""}`;
     case "grossWeight":
       return `GW: ${item.grossWeight.toFixed(3)}g`;
     case "netWeight":
       return `NW: ${item.netWeight.toFixed(3)}g`;
     case "stoneWeight":
       return item.stoneWeight > 0 ? `SW: ${item.stoneWeight.toFixed(3)}g` : "";
+    case "stoneCost":
+      return item.stoneCharge != null && item.stoneCharge > 0
+        ? `STONE: Rs. ${item.stoneCharge.toLocaleString("en-IN")}`
+        : "";
     case "diamondCarat":
       return item.diamondCarat && item.diamondCarat > 0
         ? `Dia: ${item.diamondCarat.toFixed(2)} ct${item.diamondPieces ? ` (${item.diamondPieces}p)` : ""}`
@@ -233,7 +291,7 @@ export function formatFieldValue(
     case "huid":
       return item.huid ? `HUID: ${item.huid}` : "";
     case "mrp":
-      return item.mrp ? `MRP: ₹${item.mrp.toLocaleString("en-IN")}` : "";
+      return item.mrp != null ? `MRP Rs. ${item.mrp.toLocaleString("en-IN")}` : "";
     case "customText":
       return customText || "";
     default:
@@ -316,7 +374,7 @@ export function generateTsplLabel(
           const value = formatFieldValue(elem.fieldKey, item, elem.customText);
           if (!value) continue;
 
-          const font = elem.fontSize ? String(Math.min(Math.max(elem.fontSize, 1), 5)) : "1";
+          const font = String(Math.round(Math.min(Math.max(elem.fontSize ?? 1, 1), 5)));
           const cleanValue = value.replace(/"/g, '\\"');
           lines.push(`TEXT ${xDots},${yDots},"${font}",${rotation},1,1,"${cleanValue}"`);
         }

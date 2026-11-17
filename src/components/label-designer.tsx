@@ -92,6 +92,7 @@ const SAMPLE_DEMO_ITEM = {
   grossWeight: 4.52,
   netWeight: 4.2,
   stoneWeight: 0.32,
+  stoneCharge: 5600,
   diamondCarat: 0.45,
   diamondPieces: 12,
   huid: "H98234",
@@ -107,7 +108,8 @@ const AVAILABLE_FIELDS: { key: LabelElement["fieldKey"]; label: string }[] = [
   { key: "purity", label: "Metal & Purity (e.g. 22K916)" },
   { key: "grossWeight", label: "Gross Weight (GW)" },
   { key: "netWeight", label: "Net Weight (NW)" },
-  { key: "stoneWeight", label: "Stone Weight (SW)" },
+  { key: "stoneWeight", label: "Total Stone Weight (SW)" },
+  { key: "stoneCost", label: "Stone Cost (₹)" },
   { key: "diamondCarat", label: "Diamond Carats / Pcs" },
   { key: "huid", label: "HUID Hallmarking Code" },
   { key: "mrp", label: "MRP Price" },
@@ -115,6 +117,15 @@ const AVAILABLE_FIELDS: { key: LabelElement["fieldKey"]; label: string }[] = [
   { key: "category", label: "Category" },
   { key: "customText", label: "Custom Text" },
 ];
+
+const TSPL_FONT_HEIGHT_DOTS = [0, 12, 20, 24, 32, 48] as const;
+const TSPL_FONT_OPTIONS = [
+  { value: 1, label: "1 · Extra small (8 × 12 dots)" },
+  { value: 2, label: "2 · Small (12 × 20 dots)" },
+  { value: 3, label: "3 · Medium (16 × 24 dots)" },
+  { value: 4, label: "4 · Large (24 × 32 dots)" },
+  { value: 5, label: "5 · Extra large (32 × 48 dots)" },
+] as const;
 
 export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
   const idPrefix = useId();
@@ -154,7 +165,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
     parsedTemplates.length > 0 ? parsedTemplates : DEFAULT_TEMPLATES
   );
   const [persistedTemplateIds, setPersistedTemplateIds] = useState(
-    () => new Set(initialTemplates.map((template) => template.id))
+    () => new Set(initialTemplates.map((template) => template.id).filter((id) => !id.startsWith("preset-")))
   );
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
     templates[0]?.id || DEFAULT_TEMPLATES[0].id
@@ -216,6 +227,21 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
       elements: prev.elements.filter((el) => el.id !== elemId),
     }));
     if (selectedElementId === elemId) setSelectedElementId(null);
+  };
+
+  const handleSetFieldVisibility = (fieldKey: LabelElement["fieldKey"], visible: boolean) => {
+    const matches = activeTemplate.elements.filter((element) => element.fieldKey === fieldKey);
+    if (!matches.length) {
+      if (visible) handleAddElement(fieldKey);
+      return;
+    }
+    const firstId = matches[0].id;
+    setActiveTemplate((prev) => ({
+      ...prev,
+      elements: prev.elements.map((element) => element.fieldKey === fieldKey
+        ? { ...element, isVisible: visible && element.id === firstId }
+        : element),
+    }));
   };
 
   const handleSaveTemplate = async () => {
@@ -559,8 +585,28 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
           {/* Add Fields Panel */}
           <div className="rounded-xl border border-white/10 bg-royal-card p-4 shadow-lg space-y-3">
             <h3 className="font-bold text-gold-bright text-sm border-b border-white/10 pb-2">
-              Add Fields to Tag
+              Choose Fields on Tag
             </h3>
+            <p className="text-[11px] leading-relaxed text-cream/55">Select which details print. Check a new field to add it; drag it into position on the preview, then save the template.</p>
+            <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              {AVAILABLE_FIELDS.map((field) => {
+                const matching = activeTemplate.elements.filter((element) => element.fieldKey === field.key);
+                const visible = matching.some((element) => element.isVisible);
+                return (
+                  <label key={field.key} className="flex cursor-pointer items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-cream hover:bg-white/10">
+                    <input
+                      type="checkbox"
+                      checked={visible}
+                      onChange={(event) => handleSetFieldVisibility(field.key, event.target.checked)}
+                      className="rounded border-white/20 bg-black/40 text-gold"
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <details className="border-t border-white/10 pt-2">
+              <summary className="cursor-pointer text-xs font-semibold text-cream/70">Add another copy of a field</summary>
             <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               {AVAILABLE_FIELDS.map((f) => (
                 <button
@@ -574,6 +620,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                 </button>
               ))}
             </div>
+            </details>
           </div>
         </div>
 
@@ -710,7 +757,7 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
                                 elem.fontStyle === "bold" ? "font-bold" : "font-normal"
                               }`}
                               style={{
-                                fontSize: `${(elem.fontSize || 2) * 3.8}px`,
+                                fontSize: `${(TSPL_FONT_HEIGHT_DOTS[Math.min(5, Math.max(1, Math.round(elem.fontSize || 1)))] / 8) * SCALE}px`,
                                 lineHeight: 1.1,
                               }}
                             >
@@ -878,17 +925,17 @@ export function LabelDesigner({ initialTemplates }: LabelDesignerProps) {
 
                 {activeElement.fieldKey !== "barcode" && (
                   <div>
-                    <label className="block text-xs font-semibold text-cream/70 mb-1">Font Size (1-5)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={activeElement.fontSize || 2}
-                      onChange={(e) =>
-                        handleUpdateElement(activeElement.id, { fontSize: Number(e.target.value) })
-                      }
-                      className="w-full rounded-md border border-white/15 bg-black/40 px-2 py-1 text-xs text-cream focus:border-gold focus:outline-hidden"
-                    />
+                    <label className="block text-xs font-semibold text-cream/70 mb-1">Printer Font Size</label>
+                    <select
+                      value={Math.min(5, Math.max(1, Math.round(activeElement.fontSize || 1)))}
+                      onChange={(e) => handleUpdateElement(activeElement.id, { fontSize: Number(e.target.value) })}
+                      className="w-full rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
+                    >
+                      {TSPL_FONT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value} className="bg-royal-deep text-cream">{option.label}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[10px] leading-relaxed text-cream/60">The preview shows the printer’s approximate printed height. Save the template to apply it.</p>
                   </div>
                 )}
 

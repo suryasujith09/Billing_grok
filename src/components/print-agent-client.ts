@@ -8,9 +8,32 @@ export interface PrintAgentJob {
   tsplData: string;
 }
 
+export interface PrintAgentStatus {
+  status?: string;
+  printers?: Array<{ name: string; status: string; isDefault: boolean }>;
+}
+
+function agentEndpoint(agentUrl: string, path: string) {
+  return `${agentUrl.trim().replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
+export async function checkPrintAgent(agentUrl: string): Promise<PrintAgentStatus> {
+  const response = await fetch(agentEndpoint(agentUrl, "/status"), {
+    method: "GET",
+    mode: "cors",
+    credentials: "omit",
+    cache: "no-store",
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error(`Print Agent returned HTTP ${response.status}.`);
+  const status = await response.json();
+  if (status.status !== "ONLINE") throw new Error("Print Agent did not report ONLINE status.");
+  return status;
+}
+
 export async function sendToPrintAgent(job: PrintAgentJob) {
   try {
-    const response = await fetch(`${job.agentUrl.replace(/\/$/, "")}/print/tspl`, {
+    const response = await fetch(agentEndpoint(job.agentUrl, "/print/tspl"), {
       method: "POST",
       mode: "cors",
       credentials: "omit",
@@ -38,7 +61,7 @@ export async function sendToPrintAgent(job: PrintAgentJob) {
     const detail = error instanceof Error ? error.message : String(error);
     return {
       ok: false as const,
-      error: `The Print Agent at ${job.agentUrl} could not be reached from this browser. Start the agent on the PC connected to the printer, allow this site to access the local network if prompted, and check the agent URL. (${detail})`,
+      error: `The Print Agent at ${job.agentUrl} could not be reached. Start it on the PC connected to the printer, allow this website's local network/loopback access in the browser, and confirm the website origin is allowed by the agent. (${detail})`,
     };
   }
 }

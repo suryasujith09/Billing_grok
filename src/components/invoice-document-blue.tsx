@@ -30,6 +30,8 @@ type InvoiceDoc = {
   sgst5: unknown;
   roundOff: unknown;
   grandTotal: unknown;
+  discountPercent?: unknown;
+  discountAmount?: unknown;
   oldGoldValue: unknown;
   netPayable: unknown;
   paidAmount: unknown;
@@ -53,6 +55,8 @@ type InvoiceDoc = {
     hallmarkCharge: unknown;
     otherCharge?: unknown;
     lineTotal: unknown;
+    discountPercent?: unknown;
+    discountAmount?: unknown;
   }>;
   exchanges: Array<{
     description: string;
@@ -611,6 +615,11 @@ export function InvoiceDocumentBlue({
                           </span>
                         )}
                       </p>
+                      {num(item.discountAmount) > 0 && (
+                        <p style={{ fontSize: "9px", color: C.royal, margin: "2px 0 0", lineHeight: 1.3 }}>
+                          Item discount {num(item.discountPercent)}% (− {inr(num(item.discountAmount))})
+                        </p>
+                      )}
                     </td>
                     <Td align="center" bold>{item.purity}</Td>
                     <Td align="right" muted tab>{grams(num(item.grossWeight))}</Td>
@@ -819,6 +828,10 @@ export function InvoiceDocumentBlue({
               <BRow label="• CGST @ 2.5%"                    value={inr(num(invoice.cgst5))}   muted indent />
               <BRow label="• SGST @ 2.5%"                    value={inr(num(invoice.sgst5))}   muted indent />
             </>)}
+
+            {num(invoice.discountAmount) > 0 && (
+              <BRow label={`Bill discount${num(invoice.discountPercent) > 0 ? ` (${num(invoice.discountPercent)}%)` : ""}`} value={`− ${inr(num(invoice.discountAmount))}`} muted />
+            )}
 
             {num(invoice.roundOff) !== 0 && (
               <BRow label="Round Off"  value={inr(num(invoice.roundOff))} muted />

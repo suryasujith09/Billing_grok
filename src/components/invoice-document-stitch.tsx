@@ -6,13 +6,13 @@ import { amountInWords, formatDate, grams, inr, num } from "@/lib/money";
 import styles from "./invoice-document-stitch.module.css";
 
 export type InvoiceDoc = {
-  id?: string; invoiceNo: string; date: Date | string; status: string;
+  id?: string; invoiceNo: string; invoiceType?: string; billOfSupplyReason?: string; date: Date | string; status: string;
   billerName?: string; employeeCode?: string; billerSignature?: string; counterNumber?: string; counterName?: string;
   customerName: string; customerPhone: string; customerAddr: string; customerPan: string; customerGstin: string; placeOfSupply: string; notes: string;
   goldValue: unknown; makingAmount: unknown; wastageAmount: unknown; stoneAmount: unknown; hallmarkAmount: unknown; otherAmount: unknown;
   taxable3: unknown; taxable5: unknown; cgst3: unknown; sgst3: unknown; cgst5: unknown; sgst5: unknown;
-  roundOff: unknown; grandTotal: unknown; oldGoldValue: unknown; netPayable: unknown; paidAmount: unknown; balanceAmount: unknown;
-  items: Array<{ tagNo: string; description: string; hsn: string; huid: string; metal: string; purity: string; category?: string; grossWeight: unknown; stoneWeight: unknown; netWeight: unknown; ratePerGram: unknown; goldValue: unknown; taxable3: unknown; taxable5: unknown; makingType?: string; makingValue?: unknown; makingAmount: unknown; wastageAmount?: unknown; stoneCharge: unknown; hallmarkCharge: unknown; otherAmount?: unknown; lineTotal: unknown }>;
+  roundOff: unknown; grandTotal: unknown; discountPercent?: unknown; discountAmount?: unknown; oldGoldValue: unknown; netPayable: unknown; paidAmount: unknown; balanceAmount: unknown;
+  items: Array<{ tagNo: string; description: string; hsn: string; huid: string; metal: string; purity: string; category?: string; grossWeight: unknown; stoneWeight: unknown; netWeight: unknown; ratePerGram: unknown; goldValue: unknown; taxable3: unknown; taxable5: unknown; makingType?: string; makingValue?: unknown; makingAmount: unknown; wastagePercent?: unknown; wastageAmount?: unknown; stoneCharge: unknown; hallmarkCharge: unknown; otherAmount?: unknown; pricingMode?: string; finalPrice?: unknown; discountPercent?: unknown; discountAmount?: unknown; lineTotal: unknown }>;
   exchanges: Array<{ description: string; metal?: string; purity: string; quantity?: number; grossWeight?: unknown; netWeight: unknown; dustWeight?: unknown; wastageWeight?: unknown; ratePerGram: unknown; amount: unknown }>;
   payments: Array<{ method: string; amount: unknown; reference: string }>;
 };
@@ -61,14 +61,13 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
   const [mode, setMode] = useState<"front" | "back" | "both">("both");
   const [drawer, setDrawer] = useState(false);
   const date = invoice.date instanceof Date ? invoice.date : new Date(invoice.date);
-  const validDate = Number.isNaN(date.getTime()) ? "" : `${formatDate(date)} · ${date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
-  const gross = invoice.items.reduce((sum, item) => sum + num(item.grossWeight), 0);
-  const stones = invoice.items.reduce((sum, item) => sum + num(item.stoneWeight), 0);
-  const net = invoice.items.reduce((sum, item) => sum + num(item.netWeight), 0);
+  const validDate = Number.isNaN(date.getTime()) ? "" : `${formatDate(date)} · ${date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })}`;
+  const weightedItems = invoice.items.filter((item) => item.metal !== "DIAMOND");
+  const gross = weightedItems.reduce((sum, item) => sum + num(item.grossWeight), 0);
+  const stones = weightedItems.reduce((sum, item) => sum + num(item.stoneWeight), 0);
+  const net = weightedItems.reduce((sum, item) => sum + num(item.netWeight), 0);
+  const productDiscount = invoice.items.reduce((sum, item) => sum + num(item.discountAmount), 0);
   const subtotal = num(invoice.taxable3) + num(invoice.taxable5);
-  const cgst = num(invoice.cgst3) + num(invoice.cgst5);
-  const sgst = num(invoice.sgst3) + num(invoice.sgst5);
-  const vat = cgst + sgst;
   const due = num(invoice.balanceAmount);
   const shopName = shop.name || "Surya Gold and Diamonds";
   const supplierAddress = [shop.address, shop.city, shop.state, shop.pincode].filter(Boolean).join(", ");
@@ -89,7 +88,7 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
     {(mode === "front" || mode === "both") && <article id="invoice-sheet-side-a" className="sg-sheet sg-front">
       <header className="sg-brand">
         <Image src={shop.logoUrl?.trim() || "/logo.png"} alt={`${shopName} logo`} width={88} height={88} unoptimized />
-        <div className="sg-brand-copy"><div className="sg-eyebrow">TAX INVOICE</div><h1>{shopName}</h1>
+        <div className="sg-brand-copy"><div className="sg-eyebrow">{invoice.invoiceType === "BILL_OF_SUPPLY" ? "BILL OF SUPPLY · NO GST CHARGED" : "GST TAX INVOICE"}</div><h1>{shopName}</h1>
         </div>
       <div className="sg-invoice-meta"><span>Invoice no.</span><strong>{invoice.invoiceNo}</strong><span>Date</span><strong>{validDate}</strong></div>
       </header>
@@ -99,21 +98,25 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
         <div><span className="sg-label">PLACE OF SUPPLY</span><strong>{invoice.placeOfSupply || [shop.city, shop.state].filter(Boolean).join(", ") || "—"}</strong></div>
       </section>
 
-      <div className="sg-table-wrap"><table className="sg-items"><thead><tr><th>#</th><th>ITEM DESCRIPTION</th><th>PURITY</th><th>GROSS</th><th>STONE</th><th>NET WT</th><th>RATE / G</th><th>MAKING</th><th>VA</th><th className="right">AMOUNT</th></tr></thead>
+      <div className="sg-table-wrap"><table className="sg-items"><thead><tr><th>#</th><th>ITEM DESCRIPTION</th><th>MATERIAL / PURITY</th><th>GROSS</th><th>STONE / LGD</th><th>NET WT</th><th>RATE / G</th><th>MAKING</th><th>VA</th><th>GST</th><th className="right">AMOUNT</th></tr></thead>
         <tbody>{invoice.items.map((item, i) => <tr key={`${item.tagNo}-${i}`}>
-          <td>{String(i + 1).padStart(2, "0")}</td><td><strong>{item.description || item.category || item.metal || "Jewellery"}</strong><small>{[item.tagNo && `Tag ${item.tagNo}`, item.hsn && `HSN ${item.hsn}`, item.huid && `HUID ${item.huid}`].filter(Boolean).join(" · ")}</small></td>
-          <td>{item.purity || item.metal || "—"}</td><td>{grams(num(item.grossWeight))} g</td><td>{grams(num(item.stoneWeight))} g</td><td>{grams(num(item.netWeight))} g</td><td>{cash(item.ratePerGram)}</td><td>{cash(item.makingAmount)}</td><td>{cash((Math.round(num(item.taxable3) * 0.015 * 100) * 2 + Math.round(num(item.taxable5) * 0.025 * 100) * 2) / 100)}</td><td className="right">{cash(item.lineTotal)}</td>
+          <td>{String(i + 1).padStart(2, "0")}</td><td><strong>{item.description || item.category || item.metal || "Jewellery"}</strong><small>{[item.tagNo && `ID ${item.tagNo}`, item.hsn && `HSN ${item.hsn}`, item.huid && `HUID ${item.huid}`, item.pricingMode === "MRP" && `MRP ${cash(item.finalPrice)} + GST − discount`, item.pricingMode !== "MRP" && item.stoneCharge != null && `Stone ${cash(item.stoneCharge)}`].filter(Boolean).join(" · ")}</small></td>
+          <td>{item.metal === "GOLD_PLATED" ? "Gold plated" : item.purity && item.purity !== "N/A" ? item.purity : item.metal || "—"}</td><td>{grams(num(item.grossWeight))} g</td><td>{grams(num(item.stoneWeight))} {item.metal === "DIAMOND" ? "ct LGD" : "g"}</td><td>{item.metal === "DIAMOND" ? item.pricingMode === "MRP" ? "—" : `${grams(num(item.netWeight))} ct` : `${grams(num(item.netWeight))} g`}</td><td>{item.pricingMode === "MRP" ? "—" : `${cash(item.ratePerGram)} / ${item.metal === "DIAMOND" ? "ct" : "g"}`}</td><td>{item.pricingMode === "MRP" ? "—" : cash(item.makingAmount)}</td><td>{item.pricingMode === "MRP" ? "—" : cash(item.wastageAmount)}{num(item.wastageAmount) > 0 && <small><br />VA {num(item.wastagePercent)}%</small>}</td><td>{invoice.invoiceType === "GST" ? cash(num(item.taxable3) * 0.03 + num(item.taxable5) * 0.05) : cash(0)}</td><td className="right">{cash(item.lineTotal)}{num(item.discountAmount) > 0 && <small style={{ opacity: 0.72 }}><br />Discount {num(item.discountPercent)}% − {cash(item.discountAmount)}</small>}</td>
         </tr>)}</tbody>
-        <tfoot><tr><td colSpan={3}>TOTAL WEIGHT</td><td>{grams(gross)} g</td><td>{grams(stones)} g</td><td>{grams(net)} g</td><td colSpan={4}></td></tr></tfoot>
+        <tfoot><tr><td colSpan={3}>TOTAL WEIGHT (excluding diamond carats)</td><td>{grams(gross)} g</td><td>{grams(stones)} g</td><td>{grams(net)} g</td><td colSpan={5}></td></tr></tfoot>
       </table></div>
 
+      {invoice.invoiceType === "BILL_OF_SUPPLY" && invoice.billOfSupplyReason && <p className="sg-note"><strong>Bill of Supply reason:</strong> {invoice.billOfSupplyReason}</p>}
       <div className="sg-lower">
         <section className="sg-payment"><h2>PAYMENT DETAILS</h2>
           {invoice.payments.length ? invoice.payments.map((p, i) => <div className="sg-line" key={`${p.method}-${i}`}><span>{p.method}{p.reference ? ` · ${p.reference}` : ""}</span><strong>{cash(p.amount)}</strong></div>) : <p>No payments recorded.</p>}
           {invoice.notes && <p className="sg-note">{invoice.notes}</p>}
         </section>
-        <section className="sg-totals"><div className="sg-line"><span>Taxable value</span><strong>{cash(subtotal || invoice.items.reduce((sum, item) => sum + num(item.lineTotal), 0))}</strong></div>
-          {vat > 0 && <><div className="sg-line"><span>CGST</span><strong>{cash(cgst)}</strong></div><div className="sg-line"><span>SGST</span><strong>{cash(sgst)}</strong></div></>}
+        <section className="sg-totals"><div className="sg-line"><span>{invoice.invoiceType === "BILL_OF_SUPPLY" ? "Value before discount" : "Taxable value before discount"}</span><strong>{cash(subtotal || invoice.items.reduce((sum, item) => sum + num(item.lineTotal), 0))}</strong></div>
+          {num(invoice.taxable3) > 0 && <><div className="sg-line"><span>Taxable value @ 3%</span><strong>{cash(invoice.taxable3)}</strong></div><div className="sg-line"><span>CGST @ 1.5%</span><strong>{cash(invoice.cgst3)}</strong></div><div className="sg-line"><span>SGST @ 1.5%</span><strong>{cash(invoice.sgst3)}</strong></div></>}
+          {num(invoice.taxable5) > 0 && <><div className="sg-line"><span>Making taxable value @ 5%</span><strong>{cash(invoice.taxable5)}</strong></div><div className="sg-line"><span>CGST @ 2.5%</span><strong>{cash(invoice.cgst5)}</strong></div><div className="sg-line"><span>SGST @ 2.5%</span><strong>{cash(invoice.sgst5)}</strong></div></>}
+          {productDiscount > 0 && <div className="sg-line"><span>Product discounts (after GST)</span><strong>− {cash(productDiscount)}</strong></div>}
+          {num(invoice.discountAmount) > 0 && <div className="sg-line"><span>Bill discount {num(invoice.discountPercent)}% (after GST)</span><strong>− {cash(invoice.discountAmount)}</strong></div>}
           {num(invoice.roundOff) !== 0 && <div className="sg-line"><span>Round off</span><strong>{cash(invoice.roundOff)}</strong></div>}
           <div className="sg-grand"><span>Invoice total</span><strong>{cash(invoice.grandTotal)}</strong></div>
           {num(invoice.oldGoldValue) > 0 && <div className="sg-line"><span>Less: exchange credit</span><strong>− {cash(invoice.oldGoldValue)}</strong></div>}
@@ -140,7 +143,7 @@ export function InvoiceDocumentStitch({ invoice, shop }: { invoice: InvoiceDoc; 
         </table>
       </div>}
       <div className="sg-words"><span>Amount in words</span><strong>{amountInWords(num(invoice.netPayable))}</strong></div>
-      <div className="sg-declaration"><span>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. Gold value credited is based on net precious metal content. Please refer to the reverse for terms and conditions.</span><strong>Customer signature</strong><strong>For {shopName}<small>Authorized signatory</small></strong></div>
+      <div className="sg-declaration"><span>We declare that this {invoice.invoiceType === "BILL_OF_SUPPLY" ? "Bill of Supply" : "invoice"} shows the actual price of the goods described and that all particulars are true and correct. Gold value credited is based on net precious metal content. Please refer to the reverse for terms and conditions.</span><strong>Customer signature</strong><strong>For {shopName}<small>Authorized signatory</small></strong></div>
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-[#c8b98f] pt-2 text-[9px] text-[#3f3526]">
         <div><b>Biller:</b> {invoice.billerName || "—"} <span className="ml-2"><b>Employee Code:</b> {invoice.employeeCode || "—"}</span>{invoice.counterNumber && <span className="ml-2"><b>Counter:</b> {invoice.counterNumber}{invoice.counterName ? ` · ${invoice.counterName}` : ""}</span>}</div>
         <div className="min-w-28 text-center">{invoice.billerSignature && <img src={invoice.billerSignature} alt={`${invoice.billerName || "Biller"} signature`} className="mx-auto h-9 max-w-32 object-contain" />}<b>Biller Signature</b><small className="block">{invoice.billerName || ""} · {invoice.employeeCode || ""}</small></div>

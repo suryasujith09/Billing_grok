@@ -28,6 +28,7 @@ export default async function BillingPage() {
     description: item.name,
     hsn: item.hsn,
     huid: item.huid,
+    productCode: item.productCode,
     metal: item.metal,
     purity: item.purity,
     category: item.category,
@@ -41,14 +42,20 @@ export default async function BillingPage() {
     stoneCharge: num(item.stoneCharge),
     hallmarkCharge: num(item.hallmarkCharge),
     otherCharge: num(item.otherCharge),
+    mrp: item.mrp == null ? null : num(item.mrp),
+    pricingMode: "CALCULATED" as const,
+    finalPrice: null,
+    discountPercent: 0,
+    discountAmount: 0,
+    discountMode: "PERCENT" as const,
   }));
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Counter Terminal"
-        title="New GST Invoice"
-        subtitle="Itemized jewellery billing, stock barcode lookup, metal and diamond exchange, and tax invoice generation."
+        title="New Invoice"
+        subtitle="Choose a GST Tax Invoice or a separate Bill of Supply before billing."
       />
       <BillingDesk
         rates={rateRows}
@@ -57,6 +64,8 @@ export default async function BillingPage() {
         makingGstMode={shop.makingGstMode as MakingGstMode}
         placeOfSupply={shop.state}
         biller={employee ? { name: employee.name, code: employee.employeeCode, counter: employee.counter?.number ?? "" } : { name: session?.username ?? "", code: session?.role === "admin" ? "ADMIN" : "COUNTER", counter: "" }}
+        canManageInvoiceNumbers={session?.role === "admin" || session?.role === "manager"}
+        canOverrideBillerName={session?.role === "admin"}
       />
     </div>
   );

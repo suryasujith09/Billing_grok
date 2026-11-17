@@ -5,7 +5,7 @@ import { InvoiceEditForm } from "@/components/invoice-edit-form";
 
 export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (session?.role !== "admin") redirect("/");
+  if (session?.role !== "admin") redirect("/dashboard");
 
   const { id } = await params;
   const invoice = await getInvoice(id);
@@ -17,6 +17,8 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
   const draft = {
     id: text(serialized.id),
     invoiceNo: text(serialized.invoiceNo),
+    invoiceType: text(serialized.invoiceType || "GST") as "GST" | "BILL_OF_SUPPLY",
+    billOfSupplyReason: text(serialized.billOfSupplyReason),
     customerId: typeof serialized.customerId === "string" ? serialized.customerId : null,
     customerName: text(serialized.customerName),
     customerPhone: text(serialized.customerPhone),
@@ -25,14 +27,24 @@ export default async function EditInvoicePage({ params }: { params: Promise<{ id
     customerGstin: text(serialized.customerGstin),
     placeOfSupply: text(serialized.placeOfSupply),
     notes: text(serialized.notes),
+    mrpTotal: text(serialized.mrpTotal),
+    discountPercent: text(serialized.discountPercent),
+    discountAmount: text(serialized.discountAmount),
+    discountMode: text(serialized.discountMode || "PERCENT") as "PERCENT" | "AMOUNT",
+    finalInvoiceTotal: text(serialized.grandTotal),
     items: (serialized.items as Array<Record<string, unknown>>).map((item) => ({
       ornamentId: typeof item.ornamentId === "string" ? item.ornamentId : null,
       tagNo: text(item.tagNo), description: text(item.description), hsn: text(item.hsn), huid: text(item.huid),
       metal: text(item.metal), purity: text(item.purity), category: text(item.category),
       grossWeight: text(item.grossWeight), stoneWeight: text(item.stoneWeight), netWeight: text(item.netWeight),
       ratePerGram: text(item.ratePerGram), makingType: text(item.makingType) as "PER_GRAM" | "PERCENT" | "FLAT",
-      makingValue: text(item.makingValue), wastagePercent: text(item.wastagePercent), stoneCharge: text(item.stoneCharge),
+      makingValue: text(item.makingValue), wastagePercent: text(item.wastagePercent), manualWastageAmount: text(item.wastageAmount), stoneCharge: text(item.stoneCharge),
       hallmarkCharge: text(item.hallmarkCharge), otherCharge: text(item.otherCharge),
+      pricingMode: text(item.pricingMode || "CALCULATED") as "CALCULATED" | "MRP" | "MANUAL",
+      finalPrice: text(item.finalPrice),
+      discountPercent: text(item.discountPercent),
+      discountAmount: text(item.discountAmount),
+      discountMode: text(item.discountMode || "PERCENT") as "PERCENT" | "AMOUNT",
     })),
     exchanges: (serialized.exchanges as Array<Record<string, unknown>>).map((exchange) => ({
       description: text(exchange.description), metal: text(exchange.metal), purity: text(exchange.purity),

@@ -5,7 +5,7 @@ import { decrypt } from "@/lib/session";
 const ADMIN_ONLY_PATHS = ["/reports", "/settings", "/employees"];
 
 // Paths that are always public (no session required)
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/", "/about", "/collections", "/services", "/contact", "/login", "/software/login", "/robots.txt", "/sitemap.xml", "/api/enquiries"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -14,7 +14,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-pathname", pathname);
 
   // Allow public paths through
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => p === "/" ? pathname === "/" : pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
 
   // No session → redirect to /login
   if (!session) {
-    const loginUrl = new URL("/login", request.url);
+    const loginUrl = new URL("/software/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -33,10 +33,12 @@ export async function proxy(request: NextRequest) {
     ADMIN_ONLY_PATHS.some((p) => pathname.startsWith(p)) ||
     /^\/invoices\/[^/]+\/edit\/?$/.test(pathname);
   if (session.role !== "admin" && isAdminOnlyPath) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return response;
 }
 
 export const config = {

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { PrintLog } from "@prisma/client";
 import {
   printTagAction,
   recordTagPrintResultAction,
   getPrintHistory,
+  setDefaultLabelTemplateAction,
 } from "@/lib/printer-actions";
 import { sendToPrintAgent } from "./print-agent-client";
 import { InventoryLabelPreview } from "./inventory-label-preview";
@@ -20,9 +22,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  SquarePen,
 } from "lucide-react";
 
 interface InventoryTagActionsProps {
+  isAdmin?: boolean;
   items: Array<{
     id: string;
     tagNo: string;
@@ -39,12 +43,13 @@ interface InventoryTagActionsProps {
     mrp: number | null;
     printCount: number;
     lastPrintedAt?: string | Date | null;
+    isFullyOwned?: boolean;
   }>;
   templates: LabelTemplateConfig[];
   defaultTemplateId: string;
 }
 
-export function InventoryTagActions({ items, templates, defaultTemplateId }: InventoryTagActionsProps) {
+export function InventoryTagActions({ items, templates, defaultTemplateId, isAdmin = false }: InventoryTagActionsProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [loading, setLoading] = useState(false);
@@ -192,7 +197,19 @@ export function InventoryTagActions({ items, templates, defaultTemplateId }: Inv
             Label template
             <select
               value={selectedTemplateId}
-              onChange={(event) => setSelectedTemplateId(event.target.value)}
+              onChange={async (event) => {
+                const templateId = event.target.value;
+                const previousId = selectedTemplateId;
+                setSelectedTemplateId(templateId);
+                if (!templateId) return;
+                const result = await setDefaultLabelTemplateAction(templateId);
+                if (result.ok) {
+                  setToast({ type: "success", text: "Selected label template is now the default for future printing." });
+                } else {
+                  setSelectedTemplateId(previousId);
+                  setToast({ type: "error", text: result.error });
+                }
+              }}
               className="max-w-64 rounded-md border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-cream focus:border-gold focus:outline-hidden"
               aria-label="Label template for printing"
             >
@@ -266,6 +283,7 @@ export function InventoryTagActions({ items, templates, defaultTemplateId }: Inv
                 <th className="px-3 py-3">Item Name</th>
                 <th className="px-3 py-3">Category</th>
                 <th className="px-3 py-3">Metal / Purity</th>
+                {isAdmin ? <th className="px-3 py-3">Ownership</th> : null}
                 <th className="px-3 py-3 text-right">Net Wt</th>
                 <th className="px-3 py-3 text-center">Prints</th>
                 <th className="px-3 py-3 text-right">Actions</th>
@@ -304,6 +322,11 @@ export function InventoryTagActions({ items, templates, defaultTemplateId }: Inv
                     <td className="px-3 py-2.5 text-cream/80">
                       {item.metal} {item.purity}
                     </td>
+                    {isAdmin ? (
+                      <td className="px-3 py-2.5 text-cream/80">
+                        {item.isFullyOwned ? "Fully owned" : "Not fully owned"}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2.5 text-right font-semibold">
                       {item.netWeight.toFixed(3)}g
                     </td>
@@ -321,6 +344,15 @@ export function InventoryTagActions({ items, templates, defaultTemplateId }: Inv
                     </td>
 
                     <td className="px-3 py-2.5 text-right space-x-1">
+                      {isAdmin ? (
+                        <Link
+                          href={`/inventory/${item.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-gold/50 bg-gold/20 px-2.5 py-1.5 text-[11px] font-bold text-gold-bright hover:bg-gold/30 transition"
+                          title="Edit stock details"
+                        >
+                          <SquarePen size={13} /> Edit stock
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {

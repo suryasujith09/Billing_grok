@@ -106,6 +106,7 @@
 .sg-items th:nth-child(9) { width: 8%; }
 .sg-items th:nth-child(10) { width: 9%; }
 .sg-items th:nth-child(11) { width: 15%; }
+.sg-items th:nth-child(10), .sg-items td:nth-child(10) { text-align: right; }
 .sg-items th { padding: 2.3mm 1.3mm; color: #fff; background: #a77d2d; text-align: left; font-size: 7pt; letter-spacing: .035em; white-space: nowrap; }
 .sg-items td { padding: 2.5mm 1.3mm; border-bottom: 1px solid var(--sg-line); vertical-align: top; }
 .sg-items td strong, .sg-items td small { display: block; }

@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { amountInWords, formatDate, grams, inr, num } from "@/lib/money";
 import { labelize } from "@/lib/constants";
 
@@ -175,18 +176,6 @@ function PurityBadge({ label = "916 · 22K" }: { label?: string }) {
 /**
  * Decorative gold divider with diamond motif
  */
-function GoldDivider() {
-  return (
-    <div className="flex items-center gap-2 my-2">
-      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#c4a35a] to-[#c4a35a]" />
-      <svg width="10" height="10" viewBox="0 0 10 10">
-        <polygon points="5,0 10,5 5,10 0,5" fill="#c4a35a" />
-      </svg>
-      <div className="flex-1 h-px bg-gradient-to-l from-transparent via-[#c4a35a] to-[#c4a35a]" />
-    </div>
-  );
-}
-
 /**
  * UPI QR placeholder pattern
  */
@@ -344,9 +333,13 @@ export function InvoiceDocument({
                   boxShadow: "0 2px 8px rgba(196,163,90,0.25)",
                 }}
               >
-                <img
+                <Image
                   src={logoSrc}
                   alt={`${shop.name} Logo`}
+                  width={90}
+                  height={90}
+                  unoptimized
+                  loading="eager"
                   style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   crossOrigin="anonymous"
                 />
@@ -1105,9 +1098,13 @@ export function InvoiceDocument({
               <div className="flex flex-col justify-end" style={{ paddingTop: "32px" }}>
                 {/* Shop logo small in signature block */}
                 <div className="flex justify-center mb-1">
-                  <img
+                  <Image
                     src={logoSrc}
                     alt={shop.name}
+                    width={100}
+                    height={28}
+                    unoptimized
+                    loading="eager"
                     style={{ height: "28px", objectFit: "contain", opacity: 0.7 }}
                     crossOrigin="anonymous"
                   />
@@ -1131,9 +1128,13 @@ export function InvoiceDocument({
             style={{ borderTop: "1px solid #e7dcc8" }}
           >
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src={logoSrc}
                 alt={shop.name}
+                width={100}
+                height={22}
+                unoptimized
+                loading="eager"
                 style={{ height: "22px", objectFit: "contain" }}
                 crossOrigin="anonymous"
               />

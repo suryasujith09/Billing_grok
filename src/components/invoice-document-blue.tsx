@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { amountInWords, formatDate, grams, inr, num } from "@/lib/money";
 import { labelize } from "@/lib/constants";
 
@@ -148,18 +149,6 @@ function PurityBadge() {
 }
 
 /** Decorative diamond ornament for section dividers */
-function DiamondDivider() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "6px", margin: "6px 0" }}>
-      <div style={{ flex: 1, height: "1px", background: `linear-gradient(90deg, transparent, ${C.gold})` }} />
-      <svg width="10" height="10" viewBox="0 0 10 10">
-        <polygon points="5,0 10,5 5,10 0,5" fill={C.gold} />
-      </svg>
-      <div style={{ flex: 1, height: "1px", background: `linear-gradient(90deg, ${C.gold}, transparent)` }} />
-    </div>
-  );
-}
-
 /** Star / sparkle motif used in header */
 function Sparkle({ size = 14, color = C.goldBright }: { size?: number; color?: string }) {
   const h = size / 2;
@@ -330,9 +319,13 @@ export function InvoiceDocumentBlue({
                 padding: "5px",
                 boxShadow: `0 0 20px rgba(196,163,90,0.4), 0 0 0 1px rgba(196,163,90,0.2)`,
               }}>
-                <img
+                <Image
                   src={logoSrc}
                   alt={`${shop.name} Logo`}
+                  width={90}
+                  height={90}
+                  unoptimized
+                  loading="eager"
                   style={{ width: "100%", height: "100%", objectFit: "contain" }}
                   crossOrigin="anonymous"
                 />
@@ -925,8 +918,8 @@ export function InvoiceDocumentBlue({
               </div>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: "28px" }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px" }}>
-                  <img
-                    src={logoSrc} alt={shop.name}
+                  <Image
+                    src={logoSrc} alt={shop.name} width={100} height={26} unoptimized loading="eager"
                     style={{ height: "26px", objectFit: "contain", opacity: 0.65 }}
                     crossOrigin="anonymous"
                   />
@@ -950,7 +943,7 @@ export function InvoiceDocumentBlue({
             borderTop: `1px solid rgba(196,163,90,0.3)`,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <img src={logoSrc} alt={shop.name}
+              <Image src={logoSrc} alt={shop.name} width={100} height={20} unoptimized loading="eager"
                 style={{ height: "20px", objectFit: "contain" }} crossOrigin="anonymous" />
               <span style={{ fontSize: "9px", fontWeight: 700, color: C.navy }}>{shop.name}</span>
             </div>

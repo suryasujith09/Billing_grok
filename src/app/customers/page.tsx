@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { searchCustomers } from "@/lib/queries";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
-import { Plus, Search, User, Users } from "lucide-react";
+import { Plus, Search, User } from "lucide-react";
 
 export default async function CustomersPage({
   searchParams,

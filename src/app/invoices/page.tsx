@@ -2,7 +2,7 @@ import Link from "next/link";
 import { listInvoices } from "@/lib/queries";
 import { formatDate, inr, num } from "@/lib/money";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
-import { Plus, Receipt, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { connection } from "next/server";
 import { getSession } from "@/lib/session";
 import { DeleteInvoiceButton } from "@/components/forms";

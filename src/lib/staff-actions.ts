@@ -53,7 +53,7 @@ export async function updateEmployeeAction(_previous: StaffSaveState, formData: 
     throw new Error("Enter valid employee details and choose an available role.");
   }
   const joiningDate = String(formData.get("dateOfJoining") ?? "");
-  const employee = await prisma.employee.update({ where: { id }, data: {
+  await prisma.employee.update({ where: { id }, data: {
     name, employeeCode, username, role,
     mobile: String(formData.get("mobile") ?? "").trim(),
     email: String(formData.get("email") ?? "").trim(),

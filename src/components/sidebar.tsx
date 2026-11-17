@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
@@ -129,7 +130,7 @@ export function Sidebar({
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-royal-deep text-cream md:flex">
         <div className="border-b border-white/10 px-5 py-4 flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 border border-gold/40 p-1 shadow-xs">
-            <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+            <Image src="/logo.png" alt="Logo" width={44} height={44} className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0">
             <p className="text-[9px] tracking-[0.25em] text-gold-soft uppercase">Jewellery House</p>
@@ -160,7 +161,7 @@ export function Sidebar({
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 border border-gold/40 p-1">
-                  <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+                  <Image src="/logo.png" alt="Logo" width={40} height={40} className="h-full w-full object-contain" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] tracking-[0.22em] text-gold-soft uppercase">Jewellery House</p>

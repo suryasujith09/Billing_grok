@@ -1,19 +1,15 @@
 import Link from "next/link";
 import { dashboardStats } from "@/lib/queries";
-import { grams, inr, formatDate } from "@/lib/money";
+import { grams, inr } from "@/lib/money";
 import { Button, Card, PageHeader, Stat } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { connection } from "next/server";
 import { indiaDayBounds } from "@/lib/india-time";
 import {
-  BookOpen,
-  Gem,
   Plus,
   Receipt,
-  ShoppingBag,
   Users,
-  TrendingUp,
   AlertCircle,
 } from "lucide-react";
 

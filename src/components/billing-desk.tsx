@@ -179,7 +179,6 @@ function pricedLine(item: Line, mode: MakingGstMode, includeGst = true) {
     item.discountPercent,
     item.discountAmount,
     item.discountMode,
-    includeGst,
   );
 }
 
@@ -328,7 +327,6 @@ export function BillingDesk({
       discountInputMode === "PERCENT" ? Number(discountInput) || 0 : 0,
       discountInputMode === "AMOUNT" ? Number(discountInput) || 0 : 0,
       discountInputMode,
-      invoiceType === "GST",
     );
     const totals = invoiceTotalInput === ""
       ? afterDiscount
@@ -683,13 +681,25 @@ export function BillingDesk({
         discountAmount: computed.discountAmount,
         discountMode: discountInputMode,
         finalInvoiceTotal: invoiceTotalInput === "" ? null : Number(invoiceTotalInput),
-        items: items.map(({ key: _key, ...item }) => item),
+        items: items.map((item) => {
+          const payload: Partial<Line> = { ...item };
+          delete payload.key;
+          return payload;
+        }),
         exchanges: exchanges
           .filter((ex) => ex.netWeight > 0)
-          .map(({ key: _key, ...ex }) => ex),
+          .map((exchange) => {
+            const payload: Partial<Exchange> = { ...exchange };
+            delete payload.key;
+            return payload;
+          }),
         payments: payments
           .filter((p) => p.amount > 0)
-          .map(({ key: _key, ...p }) => p),
+          .map((payment) => {
+            const payload: Partial<Pay> = { ...payment };
+            delete payload.key;
+            return payload;
+          }),
       });
       if (!result.ok) {
         setError(result.error);

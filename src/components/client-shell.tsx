@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, Receipt } from "lucide-react";
 import { Sidebar } from "./sidebar";
@@ -52,7 +53,7 @@ export function ClientShell({
               </button>
               <div className="flex items-center gap-2.5">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 border border-gold/40 p-0.5">
-                  <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+                  <Image src="/logo.png" alt="Logo" width={32} height={32} className="h-full w-full object-contain" />
                 </div>
                 <div>
                   <p className="text-[9px] tracking-[0.2em] text-gold-soft uppercase">Jewellery house</p>

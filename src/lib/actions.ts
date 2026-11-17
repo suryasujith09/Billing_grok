@@ -886,7 +886,7 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
       : item.pricingMode === "MRP"
         ? applyMrpLineBase(calculated, item.finalPrice ?? 0, includeGst)
         : applyFinalLinePrice(calculated, item.finalPrice ?? 0, includeGst);
-    const calc = applyLineDiscount(priced, item.discountPercent, item.discountAmount, item.discountMode, includeGst);
+    const calc = applyLineDiscount(priced, item.discountPercent, item.discountAmount, item.discountMode);
     return { item, calc };
   });
 
@@ -913,15 +913,13 @@ export async function createInvoiceAction(raw: unknown): Promise<ActionState> {
   const mrpBase = input.mrpTotal ?? r2(calculatedTotals.taxable3 + calculatedTotals.taxable5);
   const productDiscountAmount = r2(computedItems.reduce((sum, row) => sum + row.calc.discountAmount, 0));
   const totalsWithMrp = applyMrpBaseOverride(calculatedTotals, mrpBase, includeGst, productDiscountAmount);
-  const totalsAfterDiscount = applyInvoiceDiscount(totalsWithMrp, input.discountPercent, input.discountAmount, input.discountMode, includeGst);
+  const totalsAfterDiscount = applyInvoiceDiscount(totalsWithMrp, input.discountPercent, input.discountAmount, input.discountMode);
   const totals = input.finalInvoiceTotal == null
     ? totalsAfterDiscount
     : applyInvoiceTotalOverride(totalsAfterDiscount, input.finalInvoiceTotal);
-  if (paidAmount > totals.netPayable) {
-    return { ok: false, error: "Payment amounts cannot exceed the net payable." };
-  }
-
-  const { gstTotal: _g, beforeRound: _b, ...dbTotals } = totals;
+  const { gstTotal, beforeRound, ...dbTotals } = totals;
+  void gstTotal;
+  void beforeRound;
   try {
     const invoice = await prisma.$transaction(async (tx) => {
       const current = await tx.shop.upsert({
@@ -1259,7 +1257,7 @@ export async function updateInvoiceAction(id: string, raw: unknown): Promise<Act
           : item.pricingMode === "MRP"
             ? applyMrpLineBase(calculated, item.finalPrice ?? 0, includeGst)
             : applyFinalLinePrice(calculated, item.finalPrice ?? 0, includeGst);
-        return applyLineDiscount(priced, item.discountPercent, item.discountAmount, item.discountMode, includeGst);
+        return applyLineDiscount(priced, item.discountPercent, item.discountAmount, item.discountMode);
       })(),
     }));
     const exchanges = input.exchanges.map((exchange) => {
@@ -1287,14 +1285,13 @@ export async function updateInvoiceAction(id: string, raw: unknown): Promise<Act
     const mrpBase = input.mrpTotal ?? r2(calculatedTotals.taxable3 + calculatedTotals.taxable5);
     const productDiscountAmount = r2(computedItems.reduce((sum, row) => sum + row.calc.discountAmount, 0));
     const totalsWithMrp = applyMrpBaseOverride(calculatedTotals, mrpBase, includeGst, productDiscountAmount);
-    const totalsAfterDiscount = applyInvoiceDiscount(totalsWithMrp, input.discountPercent, input.discountAmount, input.discountMode, includeGst);
+    const totalsAfterDiscount = applyInvoiceDiscount(totalsWithMrp, input.discountPercent, input.discountAmount, input.discountMode);
     const totals = input.finalInvoiceTotal == null
       ? totalsAfterDiscount
       : applyInvoiceTotalOverride(totalsAfterDiscount, input.finalInvoiceTotal);
-    if (paidAmount > totals.netPayable) {
-      return { ok: false, error: "The edited net payable cannot be less than payments already collected." };
-    }
-    const { gstTotal: _gstTotal, beforeRound: _beforeRound, ...dbTotals } = totals;
+    const { gstTotal, beforeRound, ...dbTotals } = totals;
+    void gstTotal;
+    void beforeRound;
 
     await prisma.$transaction(async (tx) => {
       await tx.invoice.update({
@@ -1354,7 +1351,7 @@ export async function updateInvoiceAction(id: string, raw: unknown): Promise<Act
             create: exchanges,
           },
           paidAmount,
-          balanceAmount: r2(totals.netPayable - paidAmount),
+          balanceAmount: Math.max(0, r2(totals.netPayable - paidAmount)),
         },
       });
       if (updatedInvoiceNo !== current.invoiceNo) {
@@ -1396,6 +1393,9 @@ export async function addPaymentAction(
     await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
       if (invoice.status !== "FINAL") throw new Error("Invoice is not open");
+      if (!Number.isFinite(amount) || amount <= 0 || amount > num(invoice.balanceAmount)) {
+        throw new Error("Payment must be positive and cannot exceed the outstanding balance.");
+      }
       await tx.payment.create({
         data: {
           invoiceId,
@@ -1409,7 +1409,7 @@ export async function addPaymentAction(
         where: { id: invoiceId },
         data: {
           paidAmount: paid,
-          balanceAmount: r2(num(invoice.netPayable) - paid),
+          balanceAmount: Math.max(0, r2(num(invoice.netPayable) - paid)),
         },
       });
       if (session.employeeId) await tx.employeeActivity.create({ data: {

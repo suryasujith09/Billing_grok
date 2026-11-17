@@ -228,7 +228,9 @@ async function main() {
     paid,
   );
 
-  const { gstTotal: _g, beforeRound: _b, ...dbTotals } = finalTotals;
+  const { gstTotal, beforeRound, ...dbTotals } = finalTotals;
+  void gstTotal;
+  void beforeRound;
   const invoiceNo = `SGD/${financialYear()}/${padInvoice(1)}`;
 
   await prisma.invoice.create({

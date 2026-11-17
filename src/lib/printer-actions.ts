@@ -10,7 +10,6 @@ import {
   LEGACY_GOLD_DUAL_TEMPLATE_NAME,
   SPLIT_BUTTERFLY_TAG_TEMPLATE,
   MONTEX_GOLD_81X12_TEMPLATE,
-  MONTEX_GOLD_SPLIT_81X12_TEMPLATE,
   type ItemPrintData,
   type LabelElement,
   type LabelTemplateConfig,

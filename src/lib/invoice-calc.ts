@@ -140,7 +140,6 @@ export function applyLineDiscount(
   discountPercent: number,
   discountAmount: number,
   discountMode: DiscountMode,
-  includeGst = true,
 ): LineResult & { discountPercent: number; discountAmount: number } {
   // Discounts are posted after GST in this billing flow. Keep the taxable base
   // and GST intact, then subtract the discount from the customer payable.
@@ -253,7 +252,6 @@ export function applyInvoiceDiscount(
   discountPercent: number,
   discountAmount: number,
   discountMode: DiscountMode,
-  includeGst = true,
 ): InvoiceTotals & { discountPercent: number; discountAmount: number } {
   // Match item discounts: show full taxable value and GST, then apply the
   // invoice discount as the final deduction from the amount due.

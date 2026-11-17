@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
+import Image from "next/image";
 import {
   INDIAN_STATES,
   MAKING_GST_MODES,
@@ -136,9 +137,13 @@ export function ShopForm({
           {/* Logo Preview Card */}
           <div className="w-full sm:w-48 shrink-0 flex flex-col items-center justify-center rounded-md border border-dashed border-sand bg-white p-3 min-h-[90px]">
             {logo ? (
-              <img
+              <Image
                 src={logo}
                 alt="Shop Logo Preview"
+                width={192}
+                height={64}
+                unoptimized
+                loading="eager"
                 className="max-h-16 max-w-full object-contain"
                 onError={() => {}}
               />

@@ -31,6 +31,7 @@ export async function proxy(request: NextRequest) {
   // Counter trying to access admin-only paths → redirect to home
   const isAdminOnlyPath =
     ADMIN_ONLY_PATHS.some((p) => pathname.startsWith(p)) ||
+    /^\/bookings\/[^/]+\/edit\/?$/.test(pathname) ||
     /^\/invoices\/[^/]+\/edit\/?$/.test(pathname);
   if (session.role !== "admin" && isAdminOnlyPath) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

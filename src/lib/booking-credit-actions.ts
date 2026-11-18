@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "./db";
 import { getSession } from "./session";
 
@@ -97,6 +98,7 @@ export async function updateBookingAction(id: string, formData: FormData) {
   await prisma.employeeActivity.create({ data: { employeeId: session.employeeId ?? null, employeeCode: session.employeeCode ?? "ADMIN", employeeName: session.employeeName ?? session.username, action: "ADVANCE_BOOKING_EDITED", transactionNo: booking.bookingNo, oldValue: `${booking.customerName}: ${booking.bookingAmount}`, newValue: `${updated.customerName}: ${updated.bookingAmount}` } });
   revalidatePath("/bookings");
   revalidatePath(`/bookings/${id}`);
+  redirect("/bookings");
 }
 
 export async function deleteBookingAction(formData: FormData) {
@@ -110,6 +112,7 @@ export async function deleteBookingAction(formData: FormData) {
     await tx.employeeActivity.create({ data: { employeeId: session.employeeId ?? null, employeeCode: session.employeeCode ?? "ADMIN", employeeName: session.employeeName ?? session.username, action: "ADVANCE_BOOKING_DELETED", transactionNo: booking.bookingNo, oldValue: `${booking.customerName}: ${booking.bookingAmount}` } });
   });
   revalidatePath("/bookings");
+  redirect("/bookings");
 }
 
 export async function createCreditNoteAction(formData: FormData) {

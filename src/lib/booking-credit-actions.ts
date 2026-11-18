@@ -62,6 +62,56 @@ export async function addBookingPaymentAction(formData: FormData) {
   revalidatePath("/bookings");
 }
 
+async function requireBookingAdmin() {
+  const session = await getSession();
+  if (!session || session.role !== "admin") throw new Error("Administrator access is required to edit or delete advance bookings.");
+  return session;
+}
+
+export async function updateBookingAction(id: string, formData: FormData) {
+  const session = await requireBookingAdmin();
+  const booking = await prisma.advanceBooking.findUnique({ where: { id } });
+  if (!booking) throw new Error("Advance booking not found.");
+  const customerName = String(formData.get("customerName") ?? "").trim();
+  const bookingAmount = Number(formData.get("bookingAmount"));
+  const approximateWeight = Number(formData.get("approximateWeight") || 0);
+  const goldRate = Number(formData.get("goldRate") || 0);
+  const makingCharges = Number(formData.get("makingCharges") || 0);
+  const taxAmount = Number(formData.get("taxAmount") || 0);
+  if (!customerName || !String(formData.get("description") ?? "").trim() || !Number.isFinite(bookingAmount) || bookingAmount < Number(booking.advancePaid) || ![approximateWeight, goldRate, makingCharges, taxAmount].every((value) => Number.isFinite(value) && value >= 0)) {
+    throw new Error("Enter valid booking details. The booking amount cannot be less than the advance already collected.");
+  }
+  const expectedDeliveryValue = String(formData.get("expectedDelivery") ?? "");
+  const expectedDelivery = expectedDeliveryValue ? new Date(`${expectedDeliveryValue}T12:00:00`) : null;
+  if (expectedDelivery && Number.isNaN(expectedDelivery.getTime())) throw new Error("Enter a valid expected delivery date.");
+  const wasClosed = ["CANCELLED", "REFUNDED", "DELIVERED"].includes(booking.status);
+  const advancePaid = Number(booking.advancePaid);
+  const status = wasClosed ? booking.status : advancePaid >= bookingAmount ? "FULLY_PAID" : advancePaid > 0 ? "PARTIALLY_PAID" : "CONFIRMED";
+  const updated = await prisma.advanceBooking.update({ where: { id }, data: {
+    customerName, customerPhone: String(formData.get("customerPhone") ?? "").trim(), description: String(formData.get("description") ?? "").trim(),
+    productCode: String(formData.get("productCode") ?? "").trim(), category: String(formData.get("category") ?? "").trim(),
+    metal: String(formData.get("metal") ?? "GOLD"), purity: String(formData.get("purity") ?? "").trim(), approximateWeight,
+    bookingAmount, balanceAmount: Math.max(0, bookingAmount - advancePaid), expectedDelivery, goldRate, makingCharges, taxAmount,
+    instructions: String(formData.get("instructions") ?? "").trim(), status,
+  } });
+  await prisma.employeeActivity.create({ data: { employeeId: session.employeeId ?? null, employeeCode: session.employeeCode ?? "ADMIN", employeeName: session.employeeName ?? session.username, action: "ADVANCE_BOOKING_EDITED", transactionNo: booking.bookingNo, oldValue: `${booking.customerName}: ${booking.bookingAmount}`, newValue: `${updated.customerName}: ${updated.bookingAmount}` } });
+  revalidatePath("/bookings");
+  revalidatePath(`/bookings/${id}`);
+}
+
+export async function deleteBookingAction(formData: FormData) {
+  const session = await requireBookingAdmin();
+  const id = String(formData.get("id") ?? "");
+  await prisma.$transaction(async (tx) => {
+    const booking = await tx.advanceBooking.findUnique({ where: { id } });
+    if (!booking) throw new Error("Advance booking not found.");
+    await tx.advancePayment.deleteMany({ where: { bookingId: id } });
+    await tx.advanceBooking.delete({ where: { id } });
+    await tx.employeeActivity.create({ data: { employeeId: session.employeeId ?? null, employeeCode: session.employeeCode ?? "ADMIN", employeeName: session.employeeName ?? session.username, action: "ADVANCE_BOOKING_DELETED", transactionNo: booking.bookingNo, oldValue: `${booking.customerName}: ${booking.bookingAmount}` } });
+  });
+  revalidatePath("/bookings");
+}
+
 export async function createCreditNoteAction(formData: FormData) {
   const { session, employee } = await employeeContext();
   const invoiceId = String(formData.get("invoiceId") ?? "");
